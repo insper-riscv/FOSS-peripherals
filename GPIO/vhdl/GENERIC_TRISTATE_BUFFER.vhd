@@ -23,7 +23,7 @@ end GENERIC_TRISTATE_BUFFER;
 architecture RTL of GENERIC_TRISTATE_BUFFER is
 begin
     GEN_TRISTATE : for i in 0 to DATA_WIDTH-1 generate
-        BUFFER_INSTANCE : entity WORK.GENERIC_TRISTATE_BUFFER
+        BUFFER_INSTANCE : entity WORK.GENERIC_TRISTATE_BUFFER_1BIT
             port map (
                 data_in  => data_in(i),
                 enable   => enable(i),

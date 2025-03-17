@@ -20,11 +20,8 @@ entity GPIO is
         dir_enable   : in  std_logic;
         write_enable   : in  std_logic;
         read_enable   : in  std_logic;
-        -- Flag de Bitwise set, clear e toggle
-        load_enable    : in  std_logic;
-        set_enable    : in  std_logic;
-        clear_enable  : in  std_logic;
-        toggle_enable : in  std_logic;
+        --! Seletor de Load, set, clear e toggle
+        op_out  :    in  STD_LOGIC_VECTOR(1 downto 0);
         --! Vetor de dados de Saída
         data_out : out STD_LOGIC_VECTOR(DATA_WIDTH-1 downto 0);
         --! Pinos da GPIO
@@ -35,13 +32,40 @@ end GPIO;
 
 architecture RTL of GPIO is
     -- Controla each a direção de cada pino ('1' = output, '0' = input)
-    signal dir_reg : std_logic_vector(DATA_WIDTH - 1 downto 0) := (others => '0');
+    signal reg_dir : std_logic_vector(DATA_WIDTH - 1 downto 0) := (others => '0');
     -- Guarda os valores de saída dos pinos
-    signal out_reg : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
+    signal reg_out : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0');
+    --! Sinais de entrada para o MUX
+    signal mux_input_1 : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal mux_input_2 : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal mux_input_3 : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal mux_input_4 : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal mux_output  : std_logic_vector(DATA_WIDTH-1 downto 0);
 
 begin
+   
+    
+    --! Definir os valores das entradas do MUX
+    mux_input_1 <= data_in;               --! LOAD (00)
+    mux_input_2 <= reg_out OR data_in;  --! SET (01)
+    mux_input_3 <= reg_out AND NOT data_in; --! CLEAR (10)
+    mux_input_4 <= reg_out XOR data_in; --! TOGGLE (11)
 
-    -- Registrador que armazena a direção de cada pino.
+    -- Mux de Operação de Output
+    MUX_OUT: entity WORK.GENERIC_MUX_4X1
+        generic map (
+            DATA_WIDTH => DATA_WIDTH
+        )
+        port map (
+            selector   => op_out,
+            source_1   => mux_input_1,
+            source_2   => mux_input_2,
+            source_3   => mux_input_3,
+            source_4   => mux_input_4,
+            destination => mux_output
+        );
+
+    --! Registrador que armazena a direção de cada pino.
     REG_DIR : GENERIC_REGISTER
         generic map (
             DATA_WIDTH => DATA_WIDTH
@@ -51,11 +75,11 @@ begin
             clear       => clear,
             enable      => dir_enable,
             source      => data_in,
-            destination => dir_reg
+            destination => reg_dir
         );
 
-    -- Registrador que armazena os valores de saida de cada pino.
-    REG_OUT : GENERIC_SCT_REGISTER
+    --! Registrador que armazena os valores de saida de cada pino.
+    REG_OUT : GENERIC_REGISTER
         generic map (
             DATA_WIDTH => DATA_WIDTH
         )
@@ -63,15 +87,11 @@ begin
             clock       => clock,
             clear       => clear,
             enable      => write_enable,
-            source      => data_in,
-            write_enable       => load_enable,
-            set_enable       => set_enable,
-            clear_enable    => clear_enable,
-            toggle_enable   => toggle_enable,
-            destination => out_reg
+            source      => mux_output,
+            destination => reg_out
         );
 
-    -- Registrador que armazena os valores de entrada de cada pino.
+    --! Registrador que armazena os valores de entrada de cada pino.
     REG_IN : GENERIC_REGISTER
         generic map (
             DATA_WIDTH => DATA_WIDTH
@@ -84,7 +104,7 @@ begin
             destination => data_out
         );
     
-    -- Registrador que armazena os valores de entrada de cada pino.
+    --! Registrador que armazena os valores de entrada de cada pino.
     TRISTATE_BUFFER_GPIO : GENERIC_TRISTATE_BUFFER
         generic map (
             DATA_WIDTH => DATA_WIDTH
