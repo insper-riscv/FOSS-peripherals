@@ -17,7 +17,7 @@ entity GPIO is
         --! Vetor de dados de Entrada
         data_in  : in  STD_LOGIC_VECTOR(DATA_WIDTH-1 downto 0);
         --! Flag de Habilita Direção, Escrita e Leitura
-        dir_enable   : in  std_logic;
+        dir_enable    : in  std_logic;
         write_enable   : in  std_logic;
         read_enable   : in  std_logic;
         --! Seletor de Load, set, clear e toggle
