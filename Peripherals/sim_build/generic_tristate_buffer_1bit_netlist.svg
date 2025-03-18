@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:s="https://github.com/nturley/netlistsvg" width="209" height="124">
+  <style>  svg {
+      stroke: #011e41;
+      fill: none;
+    }
+    text {
+      fill:#ffffff;
+      stroke:none;
+      font-size:10px;
+      font-weight: bold;
+      font-family: "Courier New", monospace;
+    }
+    .fill-1 { fill: #003262; }
+    .fill-2 { fill: #011e41; stroke: #003262; }
+    .fill-3 { fill: #ffffff; }
+    .fill-4 { fill: #003262; }
+    .fill-5 { fill: #011e41; stroke: #fdda64; }
+    .text-1 { fill: #fdb515; }
+    .text-2 { fill: #003262; }
+    .text-3 { stroke: #fdda64; }
+    .nodelabel { text-anchor: middle; }
+    .inputPortLabel { text-anchor: end; }
+    .splitjoinBody { fill: #3c3c43; }</style>
+  <g s:type="tribuf" transform="translate(89,82)" s:width="15" s:height="30" id="cell_\3">
+    <s:alias val="$tribuf"/>
+    <s:alias val="$_TRIBUF_"/>
+    <s:alias val="tribuf-bus"/>
+    <s:alias val="$tribuf-bus"/>
+    <s:alias val="$_TRIBUF_-bus"/>
+    <path d="M0,0 L25,15 L0,30 Z" class="cell_\3 fill-1"/>
+    <g s:x="0" s:y="15" s:pid="A"/>
+    <g s:x="11" s:y="6" s:pid="EN"/>
+    <g s:x="25" s:y="15" s:pid="Y"/>
+  </g>
+  <g s:type="inputExt" transform="translate(12,87)" s:width="30" s:height="20" id="cell_data_in">
+    <text x="15" y="-4" class="nodelabel text-1 cell_data_in" s:attribute="ref">data_in</text>
+    <s:alias val="$_inputExt_"/>
+    <path d="M0,0 L0,20 L15,20 L30,10 L15,0 Z" class="cell_data_in fill-4"/>
+    <g s:x="30" s:y="10" s:pid="Y"/>
+  </g>
+  <g s:type="inputExt" transform="translate(12,22)" s:width="30" s:height="20" id="cell_enable">
+    <text x="15" y="-4" class="nodelabel text-1 cell_enable" s:attribute="ref">enable</text>
+    <s:alias val="$_inputExt_"/>
+    <path d="M0,0 L0,20 L15,20 L30,10 L15,0 Z" class="cell_enable fill-4"/>
+    <g s:x="30" s:y="10" s:pid="Y"/>
+  </g>
+  <g s:type="outputExt" transform="translate(149,87)" s:width="30" s:height="20" id="cell_data_out">
+    <text x="15" y="-4" class="nodelabel text-1 cell_data_out" s:attribute="ref">data_out</text>
+    <s:alias val="$_outputExt_"/>
+    <path d="M30,0 L30,20 L15,20 L0,10 L15,0 Z" class="cell_data_out fill-4"/>
+    <g s:x="0" s:y="10" s:pid="A"/>
+  </g>
+  <line x1="42" x2="89" y1="97" y2="97" class="net_2"/>
+  <line x1="42" x2="100" y1="32" y2="32" class="net_3"/>
+  <line x1="100" x2="100" y1="32" y2="88" class="net_3"/>
+  <line x1="114" x2="149" y1="97" y2="97" class="net_4"/>
+</svg>

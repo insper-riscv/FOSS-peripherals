@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1742257989" />
+    <testcase name="Entity.testcase.&lt;locals&gt;._testcase_wrapper" classname="lib.entity" file="/workspace/GPIO/lib/entity.py" lineno="1" time="0.022704601287841797" sim_time_ns="6e-06" ratio_time="0.00026426361440722463" />
+  </testsuite>
+</testsuites>
