@@ -155,7 +155,6 @@ class Entity(T.Type[cocotb.handle.HierarchyObject]):
             cls._package.build_vhd()
 
         for child in cls._get_children():
-
             child.build_vhd()
 
         runner.build(

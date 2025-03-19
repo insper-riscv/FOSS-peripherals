@@ -1,0 +1,6 @@
+# Ignore any sim_build directory in the repository
+**/sim_build/
+
+# Ignore Python cache directories and compiled files
+**/__pycache__/
+*.py[cod]

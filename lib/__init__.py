@@ -1,10 +1,12 @@
 import os
+import sys
 from pathlib import Path
-
 import pytest
 
+WORKSPACE_FOLDER = Path(os.getcwd()).absolute()
 
-WORKSPACE_FOLDER = Path(__file__).parent.parent.absolute()
+if str(WORKSPACE_FOLDER) not in sys.path:
+    sys.path.insert(0, str(WORKSPACE_FOLDER))
 
 
 from lib.entity import Entity
