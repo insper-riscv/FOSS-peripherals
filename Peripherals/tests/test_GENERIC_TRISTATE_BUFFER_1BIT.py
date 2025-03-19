@@ -1,23 +1,24 @@
 """
 This test file uses a structure similar to the Generic Register tests you provided.
-We define an entity class for the 1‑bit tristate buffer, then write testcases that
+We define an entity class for the multi-bit tristate buffer, then write testcases that
 verify its functionality under different conditions (enable = 0 or 1, data_in = 0 or 1).
 Finally, we provide synthesis and test-case functions using pytest markers.
 """
 
-import os
 import random
-
 import pytest
 from cocotb.binary import BinaryValue
 
 import lib
 from test_GENERICS_package import GENERICS 
 
+# Define supported data widths
+DATA_WIDTHS = [8, 32]
+
 # Definição de Classe
-class GENERIC_TRISTATE_BUFFER_1BIT(lib.Entity):
+class GENERIC_TRISTATE_BUFFER(lib.Entity):
     """
-    This class binds together the ports of our 1‑bit tristate buffer in a way that
+    This class binds together the ports of the multi-bit tristate buffer in a way that
     the test framework can interact with. The `_package` attribute allows the test
     library to know which package definitions or parameters to associate with this entity.
     """
@@ -30,93 +31,86 @@ class GENERIC_TRISTATE_BUFFER_1BIT(lib.Entity):
 
 
 # Teste Básico
-@GENERIC_TRISTATE_BUFFER_1BIT.testcase
-async def tb_TRISTATE_BUFFER_1BIT_case_1(dut: GENERIC_TRISTATE_BUFFER_1BIT, trace: lib.Waveform):
+@GENERIC_TRISTATE_BUFFER.testcase
+async def tb_GENERIC_TRISTATE_BUFFER_case_1(dut: GENERIC_TRISTATE_BUFFER, trace: lib.Waveform):
     """
     This test exercises a few combinations of data_in and enable to verify that
     data_out matches data_in when enable=1, and is 'Z' (high impedance) when enable=0.
     """
 
-    # Define as entradas a serem testadas e as saidas esperadas para cada entrada
-    test_vectors_data_in = ["0", "1", "0", "1"]
-    test_vectors_enable  = ["0", "0", "1", "1"]
-    expected_data_out    = ["Z", "Z", "0", "1"] 
+    for width in DATA_WIDTHS:
+        dut._log.info(f"Testing DATA_WIDTH = {width}")
 
-    # Testa as combinações básicas propostas
-    for i, (din, en, dout_expected) in enumerate(
-        zip(test_vectors_data_in, test_vectors_enable, expected_data_out), start=1
-    ):
-        # Coloca as entradas atuais
-        dut.data_in.value = BinaryValue(din)
-        dut.enable.value = BinaryValue(en)
+        # Generate test vectors for different bit widths
+        test_vectors = [
+            {"data_in": "0" * width, "enable": "0" * width, "expected_out": "Z" * width},
+            {"data_in": "1" * width, "enable": "1" * width, "expected_out": "1" * width},
+            {"data_in": "1010" * (width // 4), "enable": "0000" * (width // 4), "expected_out": "Z" * width},
+            {"data_in": "1100" * (width // 4), "enable": "1111" * (width // 4), "expected_out": "1100" * (width // 4)},
+        ]
 
-        # Avança um clock
-        await trace.cycle()
+        for i, vec in enumerate(test_vectors, start=1):
+            dut.data_in.value = BinaryValue(vec["data_in"])
+            dut.enable.value = BinaryValue(vec["enable"])
 
-        # Checa se o valor de saida está correto
-        yield trace.check(
-            dut.data_out,
-            dout_expected,
-            f"Cycle {i} -> data_in={din}, enable={en}, expected data_out={dout_expected}"
-        )
+            # Avança um clock
+            await trace.cycle()
+
+            # Checa se o valor de saída está correto
+            yield trace.check(
+                dut.data_out,
+                vec["expected_out"],
+                f"Cycle {i} -> data_in={vec['data_in']}, enable={vec['enable']}, expected data_out={vec['expected_out']}"
+            )
 
 
 # Teste de Carga
-@GENERIC_TRISTATE_BUFFER_1BIT.testcase
-async def tb_TRISTATE_BUFFER_1BIT_coverage(dut: GENERIC_TRISTATE_BUFFER_1BIT, trace: lib.Waveform):
+@GENERIC_TRISTATE_BUFFER.testcase
+async def tb_GENERIC_TRISTATE_BUFFER_coverage(dut: GENERIC_TRISTATE_BUFFER, trace: lib.Waveform):
     """
     This test performs a large number of random trials to cover all possible values
-    of data_in and enable. Although there are only 2 bits, we use random tests as
-    a demonstration of stress testing in a similar style to the generic register test.
+    of data_in and enable. We use random tests as a demonstration of stress testing.
     """
     
     trace.disable()
 
-    # Número de testes
-    qnt_tests = 1000
-    for i in range(qnt_tests):
-        # Gera bits aleatorios para data_in e enable
-        random_data_in = random.getrandbits(1)
-        random_enable = random.getrandbits(1)
+    for width in DATA_WIDTHS:
+        dut._log.info(f"Running stress test for DATA_WIDTH = {width}")
 
-        # Converte a entrada para string
-        str_data_in = str(random_data_in)
-        str_enable = str(random_enable)
+        qnt_tests = 1000
+        for i in range(qnt_tests):
+            # Gera valores aleatórios para data_in e enable
+            rand_data_in = format(random.getrandbits(width), f"0{width}b")
+            rand_enable = format(random.getrandbits(width), f"0{width}b")
 
-        # Coloca os valores de entrada
-        dut.data_in.value = BinaryValue(str_data_in)
-        dut.enable.value = BinaryValue(str_enable)
+            dut.data_in.value = BinaryValue(rand_data_in)
+            dut.enable.value = BinaryValue(rand_enable)
 
-        # Espera o próximo clock
-        await trace.cycle()
+            await trace.cycle()
 
-        # Determina o output esperadp
-        if random_enable == 1:
-            expected = str_data_in
-        else:
-            expected = "Z"
+            # Determina a saída esperada
+            expected_out = "".join(d if e == "1" else "Z" for d, e in zip(rand_data_in, rand_enable))
 
-        # Checa os resultados
-        yield trace.check(
-            dut.data_out,
-            expected,
-            f"Test #{i} with data_in={str_data_in}, enable={str_enable}; expected data_out={expected}"
-        )
+            yield trace.check(
+                dut.data_out,
+                expected_out,
+                f"Random Test #{i} with data_in={rand_data_in}, enable={rand_enable}; expected data_out={expected_out}"
+            )
 
 
 @pytest.mark.synthesis
-def test_TRISTATE_BUFFER_1BIT_synthesis():
-    GENERIC_TRISTATE_BUFFER_1BIT.build_vhd() 
+def test_GENERIC_TRISTATE_BUFFER_synthesis():
+    GENERIC_TRISTATE_BUFFER.build_vhd() 
 
 
 @pytest.mark.testcases
-def test_TRISTATE_BUFFER_1BIT_testcases():
-    GENERIC_TRISTATE_BUFFER_1BIT.test_with(tb_TRISTATE_BUFFER_1BIT_case_1)
+def test_GENERIC_TRISTATE_BUFFER_testcases():
+    GENERIC_TRISTATE_BUFFER.test_with(tb_GENERIC_TRISTATE_BUFFER_case_1)
 
 
 @pytest.mark.coverage
-def test_TRISTATE_BUFFER_1BIT_stress():
-    GENERIC_TRISTATE_BUFFER_1BIT.test_with(tb_TRISTATE_BUFFER_1BIT_coverage)
+def test_GENERIC_TRISTATE_BUFFER_stress():
+    GENERIC_TRISTATE_BUFFER.test_with(tb_GENERIC_TRISTATE_BUFFER_coverage)
 
 
 if __name__ == "__main__":
