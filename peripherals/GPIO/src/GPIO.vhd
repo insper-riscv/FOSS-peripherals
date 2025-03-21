@@ -6,29 +6,58 @@ library WORK;
 
 entity GPIO is
     generic (
-        --! Largura dos vetores de dados
-        DATA_WIDTH : integer := 32;
-        ADDRESS_WIDTH : integer := 4
+        --! Data Width
+        DATA_WIDTH : integer := 32
     );
     port (
-        --! Clock do Processador
+        --! Clock Signal
         clock       : in  std_logic;
-        --! Reset Sincrono dos Registradores
+        --! Clear Signal
         clear       : in  std_logic; 
-        --! Vetor de dados de Entrada
+        --! Data Inputed from the Processor
         data_in     : in  STD_LOGIC_VECTOR(DATA_WIDTH-1 downto 0);
-        --! Endereço da GPIO a ser acessado
-        address     : in  STD_LOGIC_VECTOR(ADDRESS_WIDTH-1 downto 0);
-        --! Vetor de dados de Saída
+        --! GPIO Address accessed by the Processor
+        address     : in  STD_LOGIC_VECTOR(2 downto 0);
+        --! Write Signal
+        write       : in  std_logic; 
+        --! Read Signal
+        read        : in  std_logic; 
+        --! Data Outputed to the Processor
         data_out    : out STD_LOGIC_VECTOR(DATA_WIDTH-1 downto 0);
-        --! Pinos da GPIO
+        --! GPIO Pins
         gpio_pins   : inout std_logic_vector(DATA_WIDTH-1 downto 0)
     );
 
 end GPIO;
 
 architecture RTL of GPIO is
-
+    --! Decoded Operation Signals
+    signal op_vec : std_logic_vector(7 downto 0);
 begin
+    --! Decodes the Operation based on the Address and the Read/Write Signals
+    DECODER: GPIO_OPERATION_DECODER
+        port map (
+            address => address,
+            write   => write,
+            read    => read,
+            data_out => op_vec
+        );
+    --! For each GPIO Pin, instantiate a General Digital IO
+    GENERAL_DIGITALS: for i in 0 to DATA_WIDTH-1 generate
+        GENERAL_DIGITAL: entity work.GENERAL_DIGITAL_IO
+            port map (
+                clock         => clock,
+                clear         => clear,
+                data_in       => data_in(i),
+                write_dir     => op_vec(0),
+                read_dir      => op_vec(1),
+                write_out     => op_vec(2),
+                toggle        => op_vec(3),
+                read_out      => op_vec(4),
+                read_external => op_vec(5),
+                data_out      => data_out(i),
+                gpio_pin      => gpio_pins(i)
+            );
+    end generate;
    
 end architecture;

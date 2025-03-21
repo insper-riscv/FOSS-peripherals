@@ -6,11 +6,11 @@ library WORK;
 
 entity GENERIC_TRISTATE_BUFFER_1BIT is
     port (
-        --! Vetor de dados de Entrada
+        --! Data Input
         data_in  : in std_logic;
-        --! Flag de Habilita
+        --! Enable Signal
         enable   : in  std_logic:= '0';
-        --! Vetor de dados de Saída
+        --! Data Output
         data_out : inout std_logic
     );
 
@@ -18,6 +18,6 @@ end GENERIC_TRISTATE_BUFFER_1BIT;
 
 architecture RTL of GENERIC_TRISTATE_BUFFER_1BIT is
 begin
-    -- Funciona como multiplexador. Caso enable seja 0 a data_out <= data_in. Caso contrário recebe alta impedância.
+    --! When enable is '1', data_out is equal to data_in. Otherwise, data_out is 'Z'.
     data_out <= data_in when enable = '1' else 'Z';
 end architecture;
