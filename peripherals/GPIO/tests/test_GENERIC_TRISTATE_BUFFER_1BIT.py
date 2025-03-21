@@ -21,7 +21,6 @@ class GENERIC_TRISTATE_BUFFER_1BIT(lib.Entity):
     the test framework can interact with. The `_package` attribute allows the test
     library to know which package definitions or parameters to associate with this entity.
     """
-    _package = GENERICS
 
     # Linka as entradas e saidas
     data_in = lib.Entity.Input_pin    

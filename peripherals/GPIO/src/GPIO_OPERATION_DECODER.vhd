@@ -22,15 +22,15 @@ begin
     data_out(7) <= '0';
     data_out(6) <= '0';
     --! Read Pin
-    data_out(5) <= '1' when (address = "101") AND read else '0';
+    data_out(5) <= '1' when (address = "101") AND (read = '1') else '0';
     --! Read Output
-    data_out(4) <= '1' when (address = "100") AND read else '0';
+    data_out(4) <= '1' when (address = "100") AND (read = '1') else '0';
     --! Toggle Output
-    data_out(3) <= '1' when (address = "011") AND write else '0';
+    data_out(3) <= '1' when (address = "011") AND (write = '1') else '0';
     --! Write Output
-    data_out(2) <= '1' when (address = "010") AND write else '0';
+    data_out(2) <= '1' when (address = "010") AND (write = '1') else '0';
     --! Read Direction
-    data_out(1) <= '1' when (address = "001") AND read else '0';
+    data_out(1) <= '1' when (address = "001") AND (read = '1') else '0';
     --! Write Direction
-    data_out(0) <= '1' when (address = "000") AND write else '0'; 
+    data_out(0) <= '1' when (address = "000") AND (write = '1') else '0'; 
 end architecture;

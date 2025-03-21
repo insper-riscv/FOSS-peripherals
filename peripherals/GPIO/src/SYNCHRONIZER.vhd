@@ -1,6 +1,9 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
+library work;
+use work.GENERICS.all;
+
 entity SYNCHRONIZER is
     port (
         --! Processors Clock
@@ -16,7 +19,7 @@ architecture RTL of SYNCHRONIZER is
     signal stage1, stage2 : std_logic;
 begin
     -- First flip-flop
-    FF1 : GENERIC_FLIP_FLOP 
+    FF1 : entity work.GENERIC_FLIP_FLOP
         port map (
             clock  => clock,
             clear  => '0',    -- Clear is always inactive
@@ -26,7 +29,7 @@ begin
         );
 
     -- Second flip-flop
-    FF2 : GENERIC_FLIP_FLOP 
+    FF2 : entity work.GENERIC_FLIP_FLOP 
         port map (
             clock  => clock,
             clear  => '0',    -- Clear is always inactive
@@ -39,3 +42,4 @@ begin
     sync_out <= stage2;
 
 end architecture;
+
