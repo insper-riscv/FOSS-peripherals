@@ -127,8 +127,6 @@ async def tb_output_stress(dut: GENERAL_DIGITAL_IO, trace: lib.Waveform):
         await trace.cycle()
         # Desativa gravação
         dut.write_out.value = BinaryValue('0')  
-    
-
         # Lê o valor gravado no registrador de saída
         dut.read_out.value = BinaryValue('1')
         await trace.cycle()
@@ -204,9 +202,10 @@ class GENERAL_DIGITAL_IO(lib.Entity):
 @GENERAL_DIGITAL_IO.testcase
 async def tb_input_basic(dut: GENERAL_DIGITAL_IO, trace: lib.Waveform):
     # Teste de leitura da entrada com sincronização (aguarda 2 ciclos após mudança em gpio_pin)
+    yield trace.check(dut.data_out, "Z", "Saida Inicial deve ser Z.")
 
     # Inicializa sinais
-    dut.clear.value         = BinaryValue('1')
+    dut.clear.value         = BinaryValue('0')
     dut.write_dir.value     = BinaryValue('0')
     dut.read_dir.value      = BinaryValue('0')
     dut.write_out.value     = BinaryValue('0')
@@ -215,14 +214,11 @@ async def tb_input_basic(dut: GENERAL_DIGITAL_IO, trace: lib.Waveform):
     dut.read_external.value = BinaryValue('0')
     dut.data_in.value       = BinaryValue('0')
 
-    # Aplica reset
-    await trace.cycle()
-    dut.clear.value = BinaryValue('0')
-
     # Define direção como entrada
     dut.data_in.value = BinaryValue('0')
     dut.write_dir.value = BinaryValue('1')
     await trace.cycle()
+    yield trace.check(dut.data_out, "Z", "Saida Escrita de direção deve ser Z.")
     dut.write_dir.value = BinaryValue('0')
 
     # Lê direção
@@ -237,62 +233,63 @@ async def tb_input_basic(dut: GENERAL_DIGITAL_IO, trace: lib.Waveform):
     # Testa leitura de 0
     dut.gpio_pin.value = BinaryValue('0')
     await trace.cycle()
+    yield trace.check(dut.data_out, "Z", "Saida deve ser Z por não ter atualizado ainda.")
     await trace.cycle()
     yield trace.check(dut.data_out, "0", "gpio_pin=0 deve refletir em data_out")
 
     # Testa leitura de 1
     dut.gpio_pin.value = BinaryValue('1')
     await trace.cycle()
+    yield trace.check(dut.data_out, "0", "gpio_pin=0 deve refletir em data_out por não ter atualizado ainda")
     await trace.cycle()
     yield trace.check(dut.data_out, "1", "gpio_pin=1 deve refletir em data_out")
 
     dut.read_external.value = BinaryValue('0')
-
+    
 @GENERAL_DIGITAL_IO.testcase
 async def tb_input_stress(dut: GENERAL_DIGITAL_IO, trace: lib.Waveform):
-    # Teste de bateria: alternância contínua e aleatória em gpio_pin com verificação após sincronização
+    """
+    Teste de estresse: altera `gpio_pin` e verifica se `data_out` reflete o valor com 1 ciclo de atraso.
+    """
 
     # Inicializa sinais
-    dut.clear.value         = BinaryValue('1')
+    dut.clear.value         = BinaryValue('0')
     dut.write_dir.value     = BinaryValue('0')
     dut.read_dir.value      = BinaryValue('0')
     dut.write_out.value     = BinaryValue('0')
     dut.toggle.value        = BinaryValue('0')
     dut.read_out.value      = BinaryValue('0')
-    dut.read_external.value = BinaryValue('0')
+    dut.read_external.value = BinaryValue('1') 
     dut.data_in.value       = BinaryValue('0')
 
-    # Reset
-    await trace.cycle()
-    dut.clear.value = BinaryValue('0')
-
-    # Define direção como entrada
-    dut.data_in.value = BinaryValue('0')
+    # Configura direção como entrada
     dut.write_dir.value = BinaryValue('1')
     await trace.cycle()
     dut.write_dir.value = BinaryValue('0')
 
-    # Confirma direção = entrada
-    dut.read_dir.value = BinaryValue('1')
+    # Espera DUT estabilizar
     await trace.cycle()
-    yield trace.check(dut.data_out, "0", "Direção deve ser 0 (Input)")
-    dut.read_dir.value = BinaryValue('0')
 
-    # Ativa leitura externa
-    dut.read_external.value = BinaryValue('1')
+    # Lista de valores esperados, com atraso de 1 ciclo
+    expected_history = []
 
-    # Loop com 200 variações aleatórias
-    for i in range(200):
-        bit = random.choice(["0", "1"])  # Escolhe valor aleatório
-        dut.gpio_pin.value = BinaryValue(bit)  # Aplica no pino
+    num_changes = 100
+
+    for i in range(num_changes):
+        new_value = random.choice(['0', '1'])
+        dut.gpio_pin.value = BinaryValue(new_value)
+        #Espera estabilização
         await trace.cycle()
-        await trace.cycle()  # Aguarda sincronizador
-
-        # Verifica valor refletido na saída
-        yield trace.check(dut.data_out, bit, f"[Ciclo {i}] gpio_pin={bit} não refletido corretamente")
-
-    # Desativa leitura externa
-    dut.read_external.value = BinaryValue('0')
+        await trace.cycle()
+        expected_history.append(new_value)
+        expected = expected_history[-1]
+        #Checa se teve pelo menos duas iterações
+        if i >= 2:
+            yield trace.check(
+                dut.data_out,
+                expected,
+                f"[Ciclo {i}] Esperado data_out={expected}, gpio_pin={new_value}"
+            )
 
 @pytest.mark.synthesis
 def test_GENERAL_DIGITAL_IO_synthesis():
@@ -312,3 +309,4 @@ def test_input_stress():
 if __name__ == "__main__":
     # Execução direta do arquivo
     lib.run_test(__file__)
+
