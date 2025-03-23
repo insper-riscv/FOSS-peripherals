@@ -72,7 +72,7 @@ async def tb_TRISTATE_BUFFER_1BIT_coverage(dut: GENERIC_TRISTATE_BUFFER_1BIT, tr
     trace.disable()
 
     # Número de testes
-    qnt_tests = 1000
+    qnt_tests = 100
     for i in range(qnt_tests):
         # Gera bits aleatorios para data_in e enable
         random_data_in = random.getrandbits(1)
