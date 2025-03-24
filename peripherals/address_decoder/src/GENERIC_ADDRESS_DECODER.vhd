@@ -6,7 +6,7 @@ use IEEE.NUMERIC_STD.ALL;
 library WORK;
 use work.GENERICS.all;
 
-entity addr_decoder is
+entity generic_address_decoder is
   generic (
     -- Define the width of the address bus.
     ADDR_WIDTH : natural := 32;
@@ -33,7 +33,7 @@ entity addr_decoder is
     -- Chip-select outputs for each peripheral.
     cs      : out std_logic_vector(NUM_SLAVES-1 downto 0)
   );
-end entity addr_decoder;
+end entity generic_address_decoder;
 
 architecture Behavioral of addr_decoder is
 begin
