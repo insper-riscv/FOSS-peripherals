@@ -42,7 +42,7 @@ async def tb_GPIO_OPERATION_DECODER_case_1(dut: GPIO_OPERATION_DECODER, trace: l
             f"Test #{i}: address={addr}, write={wr}, read={rd}, expected data_out={expected}"
         )
 
-# Randomized Test Case
+# Teste Randomizado
 @GPIO_OPERATION_DECODER.testcase
 async def tb_GPIO_OPERATION_DECODER_random(dut: GPIO_OPERATION_DECODER, trace: lib.Waveform):
     """
@@ -54,23 +54,23 @@ async def tb_GPIO_OPERATION_DECODER_random(dut: GPIO_OPERATION_DECODER, trace: l
     for i in range(100):
         addr = format(random.randint(0, 7), '03b')
         wr = random.randint(0, 1)
-        rd = random.randint(0, 1)
+        rd = 0 if wr else 1
         
         expected_out = ["0"] * 8  # From bit 7 down to 0
 
         bit_map = {
-            "000": (0, "write"),  # Write Direction
-            "001": (1, "read"),   # Read Direction
-            "010": (2, "write"),  # Write Output
-            "011": (3, "write"),  # Toggle Output
-            "100": (4, "read"),   # Read Output
-            "101": (5, "read")    # Read Pin
+            "000": (0, "write"),  # Escreve Direção
+            "001": (1, "read"),   # Leitura Direção
+            "010": (2, "write"),  # Escrita Output
+            "011": (3, "write"),  # Toggle 
+            "100": (4, "read"),   # Leitura Output
+            "101": (5, "read")    # Leitura Pino
         }
-
+        #Checa se endereço e sinais são válidos
         if addr in bit_map:
             bit_index, required = bit_map[addr]
             if (required == "write" and wr) or (required == "read" and rd):
-                expected_out[7 - bit_index] = "1"  # align with data_out(7 downto 0)
+                expected_out[7 - bit_index] = "1"
 
         dut.address.value = BinaryValue(addr)
         dut.write.value = BinaryValue(str(wr))

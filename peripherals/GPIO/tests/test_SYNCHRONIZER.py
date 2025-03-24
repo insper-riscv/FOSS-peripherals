@@ -29,12 +29,14 @@ async def tb_SYNCHRONIZER_case_1(dut: SYNCHRONIZER, trace: lib.Waveform):
     # Muda para 1 e espera dois ciclos
     dut.async_in.value = BinaryValue('1')
     await trace.cycle()
+    yield trace.check(dut.sync_out, "0", "sync_out deve ser 0 inicialmente")
     await trace.cycle()
     yield trace.check(dut.sync_out, "1", "sync_out deve virar 1 após 2 ciclos")
 
     # Volta para 0 e espera dois ciclos
     dut.async_in.value = BinaryValue('0')
     await trace.cycle()
+    yield trace.check(dut.sync_out, "1", "sync_out deve virar 1 após 2 ciclos")
     await trace.cycle()
     yield trace.check(dut.sync_out, "0", "sync_out deve voltar para 0 após 2 ciclos")
 
@@ -42,17 +44,18 @@ async def tb_SYNCHRONIZER_case_1(dut: SYNCHRONIZER, trace: lib.Waveform):
 @SYNCHRONIZER.testcase
 async def tb_SYNCHRONIZER_coverage(dut: SYNCHRONIZER, trace: lib.Waveform):
     trace.disable()
-
+    #Histórico de dados ASYNC
     async_history = []
 
     for i in range(100):
-        await trace.cycle()  # Espera o ciclo ocorrer antes de aplicar nova entrada
+        await trace.cycle()
 
         val = str(random.getrandbits(1))
         dut.async_in.value = BinaryValue(val)
         async_history.append(val)
-
+        #Checa se ja passou no mínimo dois Clocks
         if i >= 2:
+            # Checa a saída com o valor de dois ciclos atrás
             expected = async_history[i - 2]
             yield trace.check(
                 dut.sync_out,
