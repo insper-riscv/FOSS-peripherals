@@ -5,7 +5,7 @@ use IEEE.NUMERIC_STD.ALL;
 library WORK;
 use work.GENERICS.all;
 
-entity soc_top is
+entity address_decoder_test is
   port (
     clk      : in  std_logic;
     reset    : in  std_logic;
@@ -14,9 +14,9 @@ entity soc_top is
     data_in  : in  std_logic_vector(31 downto 0);
     data_out : out std_logic_vector(31 downto 0)
   );
-end entity soc_top;
+end entity address_decoder_test;
 
-architecture Behavioral of soc_top is
+architecture Behavioral of address_decoder_test is
 
   constant NUM_PERIPHERALS : natural := 5;
 
@@ -37,7 +37,7 @@ architecture Behavioral of soc_top is
   signal timer_ack : std_logic;
 
   -- Component declarations:
-  component addr_decoder is
+  component generic_address_decoder is
     generic (
       ADDR_WIDTH : natural := 32;
       NUM_SLAVES : natural := 4;
@@ -70,7 +70,7 @@ begin
   -----------------------------------------------------------------------------
   -- Instantiate the address decoder for 5 peripherals.
   -----------------------------------------------------------------------------
-  addr_dec_inst : addr_decoder
+  addr_dec_inst : generic_address_decoder
     generic map (
       ADDR_WIDTH => 32,
       NUM_SLAVES => NUM_PERIPHERALS,
