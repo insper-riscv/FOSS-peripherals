@@ -17,7 +17,7 @@ entity GPIO is
         --! Data Inputed from the Processor
         data_in     : in  STD_LOGIC_VECTOR(DATA_WIDTH-1 downto 0);
         --! GPIO Address accessed by the Processor
-        address     : in  STD_LOGIC_VECTOR(2 downto 0);
+        address     : in  STD_LOGIC_VECTOR(3 downto 0);
         --! Write Signal
         write       : in  std_logic; 
         --! Read Signal
@@ -31,33 +31,106 @@ entity GPIO is
 end GPIO;
 
 architecture RTL of GPIO is
-    --! Decoded Operation Signals
-    signal op_vec : std_logic_vector(7 downto 0);
+    --! GPIO Operation Decoder
+    signal dir_enable : std_logic;
+    signal write_op   : std_logic_vector(1 downto 0);
+    signal read_op    : std_logic_vector(1 downto 0);
+    --! Register output signals
+    signal reg_out    : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal reg_dir : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal reg_input : std_logic_vector(DATA_WIDTH-1 downto 0);
+    --! Mux output signals
+    signal mux_write    : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal mux_read      : std_logic_vector(DATA_WIDTH-1 downto 0);
 begin
-    --! Decodes the Operation based on the Address and the Read/Write Signals
-    DECODER: GPIO_OPERATION_DECODER
+    --! Decode the GPIO Address
+    OP_DEC : entity WORK.GPIO_OPERATION_DECODER
         port map (
             address => address,
-            write   => write,
-            read    => read,
-            data_out => op_vec
+            dir_enable => dir_enable,
+            write_op => write_op,
+            read_op => read_op
         );
-    --! For each GPIO Pin, instantiate a General Digital IO
-    GENERAL_DIGITALS: for i in 0 to DATA_WIDTH-1 generate
-        GENERAL_DIGITAL: entity work.GENERAL_DIGITAL_IO
-            port map (
-                clock         => clock,
-                clear         => clear,
-                data_in       => data_in(i),
-                write_dir     => op_vec(0),
-                read_dir      => op_vec(1),
-                write_out     => op_vec(2),
-                toggle        => op_vec(3),
-                read_out      => op_vec(4),
-                read_external => op_vec(5),
-                data_out      => data_out(i),
-                gpio_pin      => gpio_pins(i)
-            );
-    end generate;
-   
+    --! Direction Register
+    REG_DIR : entity WORK.GENERIC_REGISTER
+        generic map (
+            DATA_WIDTH => DATA_WIDTH
+        )
+        port map (
+            clock       => clock,
+            clear       => clear,
+            enable      => dir_enable, 
+            source      => data_in,     
+            destination => reg_dir     
+        );
+    --! Mux Write Operations: Load, Set, Clear, Toggle
+    MUX_WRITE : entity WORK.GENERIC_MUX_4X1
+        generic map (
+            DATA_WIDTH => DATA_WIDTH,
+        )
+        port map (
+            selector => write_op,
+            source_1 => data_in,
+            source_2 => reg_out OR data_in,
+            source_3 => reg_out AND (NOT data_in),
+            source_4 => reg_out XOR data_in,
+            destination => mux_write
+        );
+     --! Direction Register
+     REG_OUT : entity WORK.GENERIC_REGISTER
+        generic map (
+            DATA_WIDTH => DATA_WIDTH
+        )
+        port map (
+            clock       => clock,
+            clear       => clear,
+            enable      => write,
+            source      => mux_write,
+            destination => reg_out
+        );
+    --! Tristate Buffer for GPIO Pins
+    GPIO_BUFFER : entity WORK.GENERIC_TRISTATE_BUFFER
+        generic map (
+            DATA_WIDTH => DATA_WIDTH,
+        )
+        port map (
+            data_in => reg_out,
+            enable => reg_dir,
+            data_out => gpio_pins
+        );
+    --! Synchronizer for GPIO Pins
+    SYNC: entity WORK.GENERIC_SYNCHRONIZER
+        generic map (
+            DATA_WIDTH => DATA_WIDTH,
+            N          => 4
+        )
+        port map (
+            clk => clock,
+            async_in => gpio_pins,
+            sync_out => reg_input
+        );
+    --! Mux Read Operations: Read Pins, Read Registers
+    MUX_READ: entity WORK.GENERIC_MUX_4X1
+        generic map (
+            DATA_WIDTH => DATA_WIDTH,
+        )
+        port map (
+            selector => read_op,
+            source_1 => reg_dir,
+            source_2 => reg_out,
+            source_3 => reg_input,
+            source_4 => (others => '0'),
+            destination => mux_read
+        );
+    --! Read Tristate Buffer
+    GPIO_READ: entity WORK.GENERIC_TRISTATE_BUFFER
+        generic map (
+            DATA_WIDTH => DATA_WIDTH,
+        )
+        port map (
+            data_in => mux_read,
+            enable => (others => read),
+            data_out => data_out
+        );
+
 end architecture;
