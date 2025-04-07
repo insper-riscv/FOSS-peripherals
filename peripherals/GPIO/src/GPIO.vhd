@@ -17,7 +17,7 @@ entity GPIO is
         --! Data Inputed from the Processor
         data_in     : in  STD_LOGIC_VECTOR(DATA_WIDTH-1 downto 0);
         --! GPIO Address accessed by the Processor
-        address     : in  STD_LOGIC_VECTOR(3 downto 0);
+        address     : in  STD_LOGIC_VECTOR(2 downto 0);
         --! Write Signal
         write       : in  std_logic; 
         --! Read Signal
