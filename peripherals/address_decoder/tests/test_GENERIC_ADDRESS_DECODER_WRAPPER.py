@@ -1,7 +1,6 @@
 import pytest
 from cocotb.binary import BinaryValue
 from cocotb.triggers import Timer
-import cocotb
 from lib.entity import Entity
 import lib
 import copy

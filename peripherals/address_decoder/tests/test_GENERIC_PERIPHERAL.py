@@ -1,12 +1,9 @@
 import pytest
 from cocotb.binary import BinaryValue
 import cocotb
-
 import lib
-from test_GENERICS_package import GENERICS
 
 class GENERIC_PERIPHERAL(lib.Entity):
-    _package = GENERICS
 
     clk = lib.Entity.Input_pin
     reset = lib.Entity.Input_pin
