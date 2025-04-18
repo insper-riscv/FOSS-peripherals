@@ -1,50 +1,58 @@
+-- =============================================================================
+-- Entity: Generic_Register
+-- Description: Generic Register with synchronous clear and write-enable.
+--              Stores input data on rising clock edge when enabled.
+-- =============================================================================
+
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
+use IEEE.NUMERIC_STD.ALL;
 
-library WORK;
---! Registrador de uso geral
-entity GENERIC_REGISTER is
-
+-- -----------------------------------------------------------------------------
+-- Entity Declaration
+-- -----------------------------------------------------------------------------
+entity Generic_Register is
     generic (
-        --! Largura dos vetores de dados
-        DATA_WIDTH : natural := 8
+        -- Data bus width
+        WIDTH : integer := 8
     );
-
     port (
-        --! Sinal de clock
+        -- Clock signal
         clock       : in  std_logic;
-        --! Sinal de clock
-        clear       : in  std_logic := '1';
-        --! Habilita a entidade
-        enable      : in  std_logic := 'X';
-        --! Vetor de dados para escrita
-        source      : in  std_logic_vector((DATA_WIDTH - 1) downto 0) := (others => 'X');
-        --! Vetor de dados regisrados
-        destination : out std_logic_vector((DATA_WIDTH - 1) downto 0) := (others => '0')
+        -- Synchronous clear signal (active high)
+        clear       : in  std_logic;
+        -- Enable signal for writing data
+        enable      : in  std_logic;
+        -- Input data bus
+        source      : in  std_logic_vector(WIDTH-1 downto 0);
+        -- Output data bus
+        destination : out std_logic_vector(WIDTH-1 downto 0)
     );
+end entity Generic_Register;
 
-end entity;
-
-architecture RTL of GENERIC_REGISTER is
-
-    -- No signals
-
+-- -----------------------------------------------------------------------------
+-- Architecture Definition
+-- -----------------------------------------------------------------------------
+architecture Behavioral of Generic_Register is
+    -- Internal register to hold data
+    signal reg : std_logic_vector(WIDTH-1 downto 0) := (others => '0');
 begin
 
-    --! Durante a borda de subida de `clock`, caso `enable` esteja habilitado,
-    --! atribui `source` a `destination` se `clear` nãoestiver habilitado, caso
-    --! contrário atribui vetor booleano baixo a `destination`.
-    UPDATE : process(clock)
+    -- Synchronous process triggered on rising clock edge
+    process(clock)
     begin
-        if (rising_edge(clock)) then
-            if (enable = '1') then
-                if (clear = '1') then
-                    destination <= (others => '0');
-                else
-                    destination <= source;
-                end if;
+        if rising_edge(clock) then
+            -- Clear the register to zero if clear is active
+            if clear = '1' then
+                reg <= (others => '0');
+            -- Load data from source if enabled
+            elsif enable = '1' then
+                reg <= source;
             end if;
         end if;
     end process;
 
-end architecture;
+    -- Drive output with register value
+    destination <= reg;
+
+end architecture Behavioral;
