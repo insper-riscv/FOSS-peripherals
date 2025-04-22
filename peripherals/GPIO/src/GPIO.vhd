@@ -1,146 +1,164 @@
+-- =============================================================================
+-- Entity: GPIO
+-- Description:
+--   Top-level General-Purpose I/O module interfacing the processor with a 
+--   set of bidirectional I/O pins. It integrates multiple GPIO_CELL instances,
+--   a decoder for memory-mapped operations, and a multiplexer for data readback.
+--   Supports direction control, output operations, and interrupt configuration.
+--   Internal logic is based on PIN_WIDTH; output to processor is adjusted to DATA_WIDTH.
+-- =============================================================================
+
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
 library WORK;
 
+-- -----------------------------------------------------------------------------
+-- Entity Declaration
+-- -----------------------------------------------------------------------------
 entity GPIO is
     generic (
-        --! Data Width
-        DATA_WIDTH : integer := 32
+        --! Data width of processor bus
+        DATA_WIDTH : natural := 32;
+
+        --! Number of GPIO pins in the system
+        PIN_WIDTH  : natural := 32
     );
     port (
         --! Clock Signal
         clock       : in  std_logic;
-        --! Clear Signal
+
+        --! Global Reset
         clear       : in  std_logic; 
-        --! Data Inputed from the Processor
+
+        --! Data input from processor
         data_in     : in  STD_LOGIC_VECTOR(DATA_WIDTH-1 downto 0);
-        --! GPIO Address accessed by the Processor
-        address     : in  STD_LOGIC_VECTOR(2 downto 0);
-        --! Write Signal
+
+        --! Address accessed by the processor
+        address     : in  STD_LOGIC_VECTOR(3 downto 0);
+
+        --! Write enable signal
         write       : in  std_logic; 
-        --! Read Signal
+
+        --! Read enable signal
         read        : in  std_logic; 
-        --! Data Outputed to the Processor
+
+        --! Data output to processor (adjusted to DATA_WIDTH)
         data_out    : out STD_LOGIC_VECTOR(DATA_WIDTH-1 downto 0);
-        --! GPIO Pins
-        gpio_pins   : inout std_logic_vector(DATA_WIDTH-1 downto 0)
+
+        --! Interrupt request signal (active high)
+        irq         : out std_logic;
+
+        --! Bidirectional GPIO pins
+        gpio_pins   : inout std_logic_vector(PIN_WIDTH-1 downto 0)
     );
 end GPIO;
 
+-- -----------------------------------------------------------------------------
+-- Architecture Definition
+-- -----------------------------------------------------------------------------
 architecture RTL of GPIO is
 
-    --! GPIO Operation Decoder
-    signal dir_enable : std_logic;
-    signal write_op   : std_logic_vector(1 downto 0);
-    signal read_op    : std_logic_vector(1 downto 0);
+    -----------------------------------------------------------------------------
+    -- Internal Control Signals
+    -----------------------------------------------------------------------------
+    signal wr_en   : std_logic_vector(6 downto 0); -- Write enable signals
+    signal wr_op   : std_logic_vector(1 downto 0); -- Write operation
+    signal rd_sel  : std_logic_vector(2 downto 0); -- Readback selector
 
-    --! Internal Registers
-    signal reg_out    : std_logic_vector(DATA_WIDTH-1 downto 0);
-    signal reg_dir    : std_logic_vector(DATA_WIDTH-1 downto 0);
-    signal reg_input  : std_logic_vector(DATA_WIDTH-1 downto 0);
+    -----------------------------------------------------------------------------
+    -- Internal Register Banks (based on PIN_WIDTH)
+    -----------------------------------------------------------------------------
+    signal dir_reg         : std_logic_vector(PIN_WIDTH-1 downto 0);
+    signal out_reg         : std_logic_vector(PIN_WIDTH-1 downto 0);
+    signal pins_input      : std_logic_vector(PIN_WIDTH-1 downto 0);
+    signal irq_mask        : std_logic_vector(PIN_WIDTH-1 downto 0);
+    signal irq_rise_mask   : std_logic_vector(PIN_WIDTH-1 downto 0);
+    signal irq_fall_mask   : std_logic_vector(PIN_WIDTH-1 downto 0);
+    signal irq_status      : std_logic_vector(PIN_WIDTH-1 downto 0);
 
-    --! Mux output signals
-    signal mux_write  : std_logic_vector(DATA_WIDTH-1 downto 0);
-    signal mux_read   : std_logic_vector(DATA_WIDTH-1 downto 0);
+    -----------------------------------------------------------------------------
+    -- Internal Signal for GPIO_CELL Data Output
+    -----------------------------------------------------------------------------
+    type dout_array_t is array (0 to PIN_WIDTH - 1) of std_logic_vector(6 downto 0);
+    signal dout_array : dout_array_t;
+
+    -----------------------------------------------------------------------------
+    -- Internal Signal for Readback Multiplexer
+    -----------------------------------------------------------------------------
+    signal selected_read : std_logic_vector(PIN_WIDTH-1 downto 0);
 
 begin
 
-    --! Decode the GPIO Address
-    U_OP_DEC : entity WORK.GPIO_OPERATION_DECODER
+    -----------------------------------------------------------------------------
+    -- GPIO Operation Decoder
+    -----------------------------------------------------------------------------
+    U_GPIO_OPERATION_DECODER : entity work.GPIO_OPERATION_DECODER
         port map (
-            address    => address,
-            dir_enable => dir_enable,
-            write_op   => write_op,
-            read_op    => read_op
+            address => address,
+            write   => write,
+            wr_en   => wr_en,
+            wr_op   => wr_op,
+            rd_sel  => rd_sel
         );
 
-    --! Direction Register
-    U_REG_DIR : entity WORK.GENERIC_REGISTER
+    -----------------------------------------------------------------------------
+    -- GPIO_CELL Array Instantiation
+    -----------------------------------------------------------------------------
+    GEN_CELLS : for i in 0 to PIN_WIDTH - 1 generate
+    begin
+        GPIO_CELL_I : entity work.GPIO_CELL
+            port map (
+                clock      => clock,
+                clear      => clear,
+                data_in    => (others => '0') when i >= DATA_WIDTH else data_in(i),
+                data_out   => dout_array(i),
+                wr_signals => wr_en,
+                wr_op      => wr_op,
+                gpio_pin   => gpio_pins(i)
+            );
+
+        dir_reg(i)        <= dout_array(i)(0);
+        out_reg(i)        <= dout_array(i)(1);
+        pins_input(i)     <= dout_array(i)(2);
+        irq_mask(i)       <= dout_array(i)(3);
+        irq_rise_mask(i)  <= dout_array(i)(4);
+        irq_fall_mask(i)  <= dout_array(i)(5);
+        irq_status(i)     <= dout_array(i)(6);
+    end generate;
+
+    -----------------------------------------------------------------------------
+    -- Readback Multiplexer
+    -----------------------------------------------------------------------------
+    READ_MUX : entity work.GENERIC_MUX_8X1
         generic map (
-            DATA_WIDTH => DATA_WIDTH
+            DATA_WIDTH => PIN_WIDTH
         )
         port map (
-            clock       => clock,
-            clear       => clear,
-            enable      => dir_enable AND write,
-            source      => data_in,
-            destination => reg_dir
+            selector    => rd_sel,
+            source_0    => dir_reg,
+            source_1    => out_reg,
+            source_2    => pins_input,
+            source_3    => irq_mask,
+            source_4    => irq_rise_mask,
+            source_5    => irq_fall_mask,
+            source_6    => irq_status,
+            source_7    => (others => '0'),
+            destination => selected_read
         );
 
-    --! Mux Write Operations: Load, Set, Clear, Toggle
-    U_MUX_WRITE : entity WORK.GENERIC_MUX_4X1
-        generic map (
-            DATA_WIDTH => DATA_WIDTH
-        )
-        port map (
-            selector    => write_op,
-            source_1    => data_in,
-            source_2    => reg_out OR data_in,
-            source_3    => reg_out AND (NOT data_in),
-            source_4    => reg_out XOR data_in,
-            destination => mux_write
-        );
+    -----------------------------------------------------------------------------
+    -- Output truncation or padding to match DATA_WIDTH
+    -- If PIN_WIDTH >= DATA_WIDTH, truncate the output to DATA_WIDTH.
+    -- If PIN_WIDTH < DATA_WIDTH, pad the output with zeros.
+    -----------------------------------------------------------------------------
+    data_out <= selected_read(DATA_WIDTH-1 downto 0) when PIN_WIDTH >= DATA_WIDTH else
+                selected_read & (others => '0')(DATA_WIDTH-1 downto PIN_WIDTH);
 
-    --! Output Register
-    U_REG_OUT : entity WORK.GENERIC_REGISTER
-        generic map (
-            DATA_WIDTH => DATA_WIDTH
-        )
-        port map (
-            clock       => clock,
-            clear       => clear,
-            enable      => write AND NOT dir_enable,
-            source      => mux_write,
-            destination => reg_out
-        );
-
-    --! Tristate Buffer for GPIO Pins
-    U_GPIO_BUFFER : entity WORK.GENERIC_TRISTATE_BUFFER
-        generic map (
-            DATA_WIDTH => DATA_WIDTH
-        )
-        port map (
-            data_in  => reg_out,
-            enable   => reg_dir,
-            data_out => gpio_pins
-        );
-
-    --! Synchronizer for GPIO Pins
-    U_SYNC : entity WORK.GENERIC_SYNCHRONIZER
-        generic map (
-            DATA_WIDTH => DATA_WIDTH,
-            N          => 2
-        )
-        port map (
-            clock       => clock,
-            async_in  => gpio_pins,
-            sync_out  => reg_input
-        );
-
-    --! Mux Read Operations: Read Dir, Read Out, Read Ext
-    U_MUX_READ : entity WORK.GENERIC_MUX_4X1
-        generic map (
-            DATA_WIDTH => DATA_WIDTH
-        )
-        port map (
-            selector    => read_op,
-            source_1    => reg_dir,
-            source_2    => reg_out,
-            source_3    => reg_input,
-            source_4    => (others => '0'),
-            destination => mux_read
-        );
-
-    --! Read Tristate Buffer
-    U_GPIO_READ : entity WORK.GENERIC_TRISTATE_BUFFER
-        generic map (
-            DATA_WIDTH => DATA_WIDTH
-        )
-        port map (
-            data_in  => mux_read,
-            enable   => (others => read),
-            data_out => data_out
-        );
+    -----------------------------------------------------------------------------
+    -- Interrupt Generation Logic. 
+    -- IRQ is asserted if any of the interrupt status bits are set (Reduce Or Operation).
+    -----------------------------------------------------------------------------
+    irq <= '1' when irq_status /= (others => '0') else '0';
 
 end architecture;

@@ -28,7 +28,7 @@ entity GENERIC_FLIP_FLOP is
         source : in  std_logic;
 
         -- Flip-flop output (registered value)
-        state  : out std_logic
+        destination  : out std_logic
     );
 end entity GENERIC_FLIP_FLOP;
 
@@ -44,9 +44,9 @@ begin
         if rising_edge(clock) then
             -- Priority: clear has precedence over enable
             if clear = '1' then
-                state <= '0';
+                destination <= '0';
             elsif enable = '1' then
-                state <= source;
+                destination <= source;
             end if;
         end if;
     end process;

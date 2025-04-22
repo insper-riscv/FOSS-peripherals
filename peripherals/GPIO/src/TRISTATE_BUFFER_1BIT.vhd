@@ -1,5 +1,5 @@
 -- =============================================================================
--- Entity: GENERIC_TRISTATE_BUFFER_1BIT
+-- Entity: TRISTATE_BUFFER_1BIT
 -- Description: 1-bit tri-state buffer. Drives the output with the input value
 --              when enabled, or sets it to high-impedance ('Z') when disabled.
 -- =============================================================================
@@ -12,7 +12,7 @@ library WORK;
 -- -----------------------------------------------------------------------------
 -- Entity Declaration
 -- -----------------------------------------------------------------------------
-entity GENERIC_TRISTATE_BUFFER_1BIT is
+entity TRISTATE_BUFFER_1BIT is
     port (
         -- Data input to be driven onto the shared bus
         data_in  : in  std_logic;
@@ -21,12 +21,12 @@ entity GENERIC_TRISTATE_BUFFER_1BIT is
         -- Shared bidirectional bus line (output)
         data_out : out std_logic
     );
-end GENERIC_TRISTATE_BUFFER_1BIT;
+end TRISTATE_BUFFER_1BIT;
 
 -- -----------------------------------------------------------------------------
 -- Architecture Definition
 -- -----------------------------------------------------------------------------
-architecture RTL of GENERIC_TRISTATE_BUFFER_1BIT is
+architecture RTL of TRISTATE_BUFFER_1BIT is
 begin
 
     -- Tri-state logic: drive data_out when enabled, otherwise high-impedance
