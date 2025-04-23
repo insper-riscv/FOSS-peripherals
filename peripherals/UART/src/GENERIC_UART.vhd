@@ -44,26 +44,28 @@ architecture Structural of generic_uart is
     signal baud_tick : std_logic;
 
     -- Operation‐decoder outputs
-    signal control_signal  : std_logic_vector(CONTROL_SIGNAL_WIDTH-1 downto 0);
-    signal wr_config       : std_logic;
-    signal wr_tx_op        : std_logic;
-    signal rd_rx_op        : std_logic;
+    signal control_signal   : std_logic_vector(CONTROL_SIGNAL_WIDTH-1 downto 0);
+    signal wr_config        : std_logic;
+    signal wr_tx_op         : std_logic;
+    signal rd_rx_op         : std_logic;
     
     -- Register outputs
-    signal tx_reg_data     : std_logic_vector(UART_DATA_BITS-1 downto 0);
-    signal rx_reg_data     : std_logic_vector(UART_DATA_BITS-1 downto 0);
-    signal rx_reg_out      : std_logic_vector(UART_DATA_BITS-1 downto 0);
+    signal tx_reg_data      : std_logic_vector(UART_DATA_BITS-1 downto 0);
+    signal rx_reg_data      : std_logic_vector(UART_DATA_BITS-1 downto 0);
+    signal rx_reg_out       : std_logic_vector(UART_DATA_BITS-1 downto 0);
 
-    signal config_reg_data : std_logic_vector(DATA_WIDTH-1 downto 0);
-    alias baud_div_i       : std_logic_vector(COUNTER_WIDTH-1 downto 0) is config_reg_data(COUNTER_WIDTH-1 downto 0);
-    alias en_rx            : std_logic is config_reg_data(COUNTER_WIDTH);      -- next bit up
-    alias en_tx            : std_logic is config_reg_data(COUNTER_WIDTH + 1);  -- next bit up
+    signal config_reg_data  : std_logic_vector(DATA_WIDTH-1 downto 0);
+    alias baud_div_i        : std_logic_vector(COUNTER_WIDTH-1 downto 0) is config_reg_data(COUNTER_WIDTH-1 downto 0);
+    alias en_rx             : std_logic is config_reg_data(COUNTER_WIDTH);      -- next bit up
+    alias en_tx             : std_logic is config_reg_data(COUNTER_WIDTH + 1);  -- next bit up
 
-    signal wr_tx_strobe    : std_logic;
-    signal rd_rx_strobe    : std_logic;
+    signal wr_tx_strobe     : std_logic;
+    signal wr_rx_reg_strobe : std_logic;
+    signal rd_rx_strobe     : std_logic;
     
-    wr_tx_strobe <= wr_i and en_tx;
-    rd_rx_strobe <= rd_i and en_rx;
+    wr_tx_strobe     <= wr_i and en_tx;
+    rd_rx_strobe     <= rd_i and en_rx;
+    wr_rx_reg_strobe <= rx_ready_o and en_rx;
 
 begin
 
@@ -161,7 +163,7 @@ begin
         port map (
             clk    => clk,
             reset  => reset,
-            wr_i   => rd_rx_op,
+            wr_i   => wr_rx_reg_strobe,
             data_i => rx_reg_data,
             data_o => rx_reg_out
         );
