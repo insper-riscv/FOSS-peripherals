@@ -19,37 +19,30 @@ entity generic_operation_decoder is
         OP_TO_CONTROL_MAP      : operation_mapping_matrix(0 to MAPPING_NUM-1, 0 to 1) := (others => (others => (others => '0')));
 
         --! Default value for the control signal
-        DEFAULT_CONTROL_SIGNAL : std_logic_vector(CONTROL_SIGNAL_WIDTH downto 0) := (others => '0')
+        DEFAULT_CONTROL_SIGNAL : std_logic_vector(CONTROL_SIGNAL_WIDTH-1 downto 0) := (others => '0')
     );
     port ( 
         --! Operation to decode
-        operation              : in std_logic_vector(OP_WIDTH downto 0);
+        operation              : in std_logic_vector(OP_WIDTH-1 downto 0);
         
         --! Control signal
-        control_signal         : out std_logic_vector(CONTROL_SIGNAL_WIDTH downto 0)
+        control_signal         : out std_logic_vector(CONTROL_SIGNAL_WIDTH-1 downto 0)
     );
 end entity;
 
 architecture Behavioral of generic_operation_decoder is
 begin
-    -- Process to decode the operation
     decode_proc: process(operation)
-        variable match_found : boolean := false;
     begin
-        -- Default: set to the default control signal
+        -- start with default
         control_signal <= DEFAULT_CONTROL_SIGNAL;
-        match_found := false;
-        
-        -- Check if operation matches any of the defined operations
+
+        -- override if we find a match
         for i in 0 to MAPPING_NUM-1 loop
-            -- If this is the right operation, output the corresponding control signal
-            if operation = OP_TO_CONTROL_MAP(i, 0)(OP_WIDTH downto 0) then
-                control_signal <= OP_TO_CONTROL_MAP(i, 1)(CONTROL_SIGNAL_WIDTH downto 0);
-                match_found := true;
+            if operation = OP_TO_CONTROL_MAP(i, 0) then
+                control_signal <= OP_TO_CONTROL_MAP(i, 1);
                 exit;
             end if;
         end loop;
-        
-        -- If no match was found, output will remain at the default value
     end process decode_proc;
 end architecture Behavioral;
