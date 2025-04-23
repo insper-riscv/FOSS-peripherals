@@ -81,10 +81,10 @@ begin
     )
     port map (
       selector    => wr_op,
-      source_1    => std_logic_vector'(data_in),     -- Load
+      source_1 => (0 => data_in),     -- Load
       source_2    => std_logic_vector'("1"),         -- Set
       source_3    => std_logic_vector'("0"),         -- Clear
-      source_4    => std_logic_vector'(not out_reg), -- Toggle
+      source_4 => (0 => not out_reg), -- Toggle
       destination => mux_write_vector                -- intermediate 1-bit vector
     );
 
@@ -121,7 +121,7 @@ begin
   -- Synchronizer: Synchronizes the asynchronous GPIO pin input to the clock domain.
   -- This is necessary to avoid metastability issues when reading the GPIO pin.
   -----------------------------------------------------------------------------      
-  U_SYNC : entity WORK.GENERIC_SYNCHRONIZER
+  U_SYNC : entity WORK.GENERIC_SYNCHRONIZER_1BIT
     generic map (N => 2) -- Number of stages in the synchronizer
     port map (
         clock       => clock,
