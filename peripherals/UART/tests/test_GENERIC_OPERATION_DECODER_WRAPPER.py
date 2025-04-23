@@ -6,7 +6,7 @@ from lib.entity import Entity
 import lib
 import copy
 from test_TYPES_package import TYPES
-from test_GENERIC_ADDRESS_DECODER import GENERIC_ADDRESS_DECODER
+from test_GENERIC_OPERATION_DECODER_package import GENERIC_OP_DECODER
 
 
 class GENERIC_ADDRESS_DECODER_WRAPPER(Entity):
@@ -18,7 +18,7 @@ class GENERIC_ADDRESS_DECODER_WRAPPER(Entity):
     address = Entity.Input_pin
     cs = Entity.Output_pin
 
-    child = GENERIC_ADDRESS_DECODER
+    child = GENERIC_OP_DECODER
     
     # Use the original configure method but change the classname in references
     @classmethod
