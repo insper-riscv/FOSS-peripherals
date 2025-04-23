@@ -53,10 +53,6 @@ void gpio_toggle_pins(uint32_t mask)  { REG(GPIO_WR_OUT_TGL_OFFSET)  = mask;  }
 void gpio_irq_set_mask(uint32_t mask)      { REG(GPIO_WR_IRQ_MASK_OFFSET)  = mask; }
 void gpio_irq_set_rise_mask(uint32_t mask) { REG(GPIO_WR_RISE_MASK_OFFSET) = mask; }
 void gpio_irq_set_fall_mask(uint32_t mask) { REG(GPIO_WR_FALL_MASK_OFFSET) = mask; }
-void gpio_irq_clear(uint32_t mask){
-    // Clear the interrupt status for the specified mask
-    REG(GPIO_WR_IRQ_CLR_OFFSET) = mask;
-}
 
 
 /* ---------------------------------------------------------------------------

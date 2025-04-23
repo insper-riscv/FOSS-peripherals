@@ -64,18 +64,17 @@ architecture RTL of GPIO_OPERATION_DECODER is
   constant ADDR_WR_IRQ_MASK  : std_logic_vector(3 downto 0) := "0101";
   constant ADDR_WR_RISE_MASK : std_logic_vector(3 downto 0) := "0110";
   constant ADDR_WR_FALL_MASK : std_logic_vector(3 downto 0) := "0111";
-  constant ADDR_WR_IRQ_CLR   : std_logic_vector(3 downto 0) := "1000";
 
   -- ===========================================================================
   -- READ Address Map
   -- ===========================================================================
-  constant ADDR_RD_DIR       : std_logic_vector(3 downto 0) := "1001";
-  constant ADDR_RD_OUT       : std_logic_vector(3 downto 0) := "1010";
-  constant ADDR_RD_PINS      : std_logic_vector(3 downto 0) := "1011";
-  constant ADDR_RD_IRQ_STAT  : std_logic_vector(3 downto 0) := "1100";
-  constant ADDR_RD_IRQ_MASK  : std_logic_vector(3 downto 0) := "1101";
-  constant ADDR_RD_RISE_MASK : std_logic_vector(3 downto 0) := "1110";
-  constant ADDR_RD_FALL_MASK : std_logic_vector(3 downto 0) := "1111";
+  constant ADDR_RD_DIR       : std_logic_vector(3 downto 0) := "1000";
+  constant ADDR_RD_OUT       : std_logic_vector(3 downto 0) := "1001";
+  constant ADDR_RD_PINS      : std_logic_vector(3 downto 0) := "1010";
+  constant ADDR_RD_IRQ_STAT  : std_logic_vector(3 downto 0) := "1011";
+  constant ADDR_RD_IRQ_MASK  : std_logic_vector(3 downto 0) := "1100";
+  constant ADDR_RD_RISE_MASK : std_logic_vector(3 downto 0) := "1101";
+  constant ADDR_RD_FALL_MASK : std_logic_vector(3 downto 0) := "1110";
 
 begin
 
@@ -93,7 +92,7 @@ begin
   wr_en(WR_IRQ_MASK_I)  <= write when address = ADDR_WR_IRQ_MASK  else '0';
   wr_en(WR_RISE_MASK_I) <= write when address = ADDR_WR_RISE_MASK else '0';
   wr_en(WR_FALL_MASK_I) <= write when address = ADDR_WR_FALL_MASK else '0';
-  wr_en(WR_IRQ_CLR_I)   <= write when address = ADDR_WR_IRQ_CLR   else '0';
+  wr_en(WR_IRQ_CLR_I)   <= write when address = ADDR_RD_IRQ_STAT   else '0';
 
   -- -----------------------------------------------------------------------------
   -- GPIO OUTPUT OPERATION: multiplexer selector (wr_op)

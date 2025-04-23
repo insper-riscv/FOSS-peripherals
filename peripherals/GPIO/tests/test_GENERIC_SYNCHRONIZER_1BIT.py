@@ -79,6 +79,8 @@ async def tb_SYNCHRONIZER_1BIT_stress(dut, trace):
 @pytest.mark.synthesis
 def test_SYNCHRONIZER_1BIT_synthesis():
     GENERIC_SYNCHRONIZER_1BIT.build_vhd()
+    GENERIC_SYNCHRONIZER_1BIT.build_netlistsvg()
+
 
 
 # -----------------------------------------------------------------------------

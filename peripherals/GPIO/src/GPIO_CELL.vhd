@@ -199,7 +199,7 @@ begin
   U_IRQ_STATUS : entity WORK.GENERIC_FLIP_FLOP
     port map (
         clock       => clock,
-        clear       => clear or (data_in AND wr_signals(6)), -- Clear interrupt status on W1C
+        clear       => clear or (wr_signals(6)), -- Clear on Read
         enable      => interrupt_logic AND irq_mask, -- Set interrupt status if interrupt logic is high and mask is enabled
         source      => '1', -- Set interrupt status to '1' on edge detection
         destination => irq_status -- Interrupt status register

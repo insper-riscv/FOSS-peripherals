@@ -89,6 +89,7 @@ async def tb_TRISTATE_BUFFER_1BIT_coverage(dut: TRISTATE_BUFFER_1BIT, trace: lib
 @pytest.mark.synthesis
 def test_TRISTATE_BUFFER_1BIT_synthesis():
     TRISTATE_BUFFER_1BIT.build_vhd()
+    TRISTATE_BUFFER_1BIT.build_netlistsvg()
 
 # -----------------------------------------------------------------------------
 # Manual testcase runner

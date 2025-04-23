@@ -1,3 +1,4 @@
+'''
 # =========================== OUTPUT-MODE TEST ===========================
 import pytest
 import lib
@@ -101,6 +102,7 @@ async def tb_gpio_cell_output(dut: GPIO_CELL, trace: lib.Waveform):
 @pytest.mark.synthesis
 def test_GPIO_CELL_synthesis():
     GPIO_CELL.build_vhd()
+    GPIO_CELL.build_netlistsvg()
 
 # ----------------------------------------------------------------------------
 # Test execution
@@ -112,7 +114,6 @@ def test_gpio_cell_output():
 if __name__ == "__main__":
     lib.run_test(__file__)
 '''
-
 # =========================== INPUT-MODE & IRQ TEST ===========================
 import pytest
 import lib
@@ -128,7 +129,7 @@ class GPIO_CELL(lib.Entity):
     clock      = lib.Entity.Input_pin
     clear      = lib.Entity.Input_pin
     data_in    = lib.Entity.Input_pin
-    wr_signals = lib.Entity.Input_pin
+    wr_signals = lib.Entity.Input_pin  # 7-bit vector (wr_en)
     wr_op      = lib.Entity.Input_pin
     data_out   = lib.Entity.Output_pin
     gpio_pin   = lib.Entity.Input_pin
@@ -141,7 +142,7 @@ WR_DIR       = 0
 WR_IRQ_MASK  = 3
 WR_RISE_MASK = 4
 WR_FALL_MASK = 5
-WR_IRQ_W1C   = 6
+WR_IRQ_CLR   = 6  # <- mapped to read of IRQ status ("1011")
 
 # ----------------------------------------------------------------------------
 # Helper functions	
@@ -157,13 +158,17 @@ async def write_register(dut, trace, bit_index, value="1"):
     dut.data_in.value = BinaryValue("0")
     await trace.cycle()
 
+async def read_and_clear_irq(dut, trace):
+    """Simulates a read that clears IRQ by asserting wr_signals(6)."""
+    dut.wr_signals.value = BinaryValue(onehot(WR_IRQ_CLR))
+    await trace.cycle()
+    dut.wr_signals.value = BinaryValue("0000000")
+    await trace.cycle()
+
 async def set_pin(dut, trace, value):
     dut.gpio_pin.value = BinaryValue(str(value))
     for _ in range(3):
         await trace.cycle()
-
-async def check_irq(dut, expected, message):
-    yield trace.check(dut.data_out, expected, message)
 
 # ----------------------------------------------------------------------------
 # Test case: GPIO cell as input with IRQ
@@ -193,34 +198,38 @@ async def tb_gpio_cell_input_irq(dut: GPIO_CELL, trace: lib.Waveform):
     await set_pin(dut, trace, 1)
     yield trace.check(dut.data_out, "1111100", "Step 4: Rising edge triggered IRQ")
 
-    # Step 5: Clear IRQ
-    await write_register(dut, trace, WR_IRQ_W1C, "1")
-    yield trace.check(dut.data_out, "0111100", "Step 5: IRQ cleared")
+    # Step 5: Read to clear IRQ
+    await read_and_clear_irq(dut, trace)
+    yield trace.check(dut.data_out, "0111100", "Step 5: IRQ cleared after read")
 
     # Step 6: Falling edge, should trigger IRQ
     await set_pin(dut, trace, 0)
     yield trace.check(dut.data_out, "1111000", "Step 6: Falling edge triggered IRQ")
 
-    # Step 7: Clear and disable rise mask, rising edge should be ignored
-    await write_register(dut, trace, WR_IRQ_W1C, "1")
+    # Step 7: Read to clear and disable rising mask
+    await read_and_clear_irq(dut, trace)
     await write_register(dut, trace, WR_RISE_MASK, "0")
-    yield trace.check(dut.data_out, "0101000", "Step 7: Rise mask disabled")
+    yield trace.check(dut.data_out, "0101000", "Step 7: IRQ cleared, rise mask disabled")
 
-    # Step 8: Rising edge should be ignored now
+    # Step 8: Rising edge ignored
     await set_pin(dut, trace, 1)
     yield trace.check(dut.data_out, "0101100", "Step 8: Rising edge ignored (mask off)")
 
-    # Step 9: Disable IRQ mask globally while falling edge is enabled. Falling edge should be ignored and no IRQ.
+    # Step 9: Disable IRQ mask globally, falling still masked
     await write_register(dut, trace, WR_IRQ_MASK, "0")
     await set_pin(dut, trace, 0)
-    yield trace.check(dut.data_out, "0100000", "Step 9: IRQ globally disabled while falling edge enabled")
+    yield trace.check(dut.data_out, "0100000", "Step 9: IRQ globally disabled")
 
+# ----------------------------------------------------------------------------
 # Synthesis test
+# ----------------------------------------------------------------------------
 @pytest.mark.synthesis
 def test_GPIO_CELL_synthesis():
     GPIO_CELL.build_vhd()
 
+# ----------------------------------------------------------------------------
 # Test execution
+# ----------------------------------------------------------------------------
 @pytest.mark.testcases
 def test_gpio_cell_input_irq():
     GPIO_CELL.test_with(tb_gpio_cell_input_irq)
@@ -228,5 +237,3 @@ def test_gpio_cell_input_irq():
 if __name__ == "__main__":
     lib.run_test(__file__)
 
-
-'''
