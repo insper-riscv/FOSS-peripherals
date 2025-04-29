@@ -22,11 +22,8 @@ class GENERIC_UART_TX(Entity):
     DATA_BITS = 8
 
     @classmethod
-    def configure(cls, data_bits=8, baud_rate=9600, clock_freq=100_000_000):
+    def configure(cls, data_bits=8):
         cls.DATA_BITS = data_bits
-        # BAUD_RATE and CLOCK_FREQ are not VHDL generics, but may be used for test timing
-        cls.BAUD_RATE = baud_rate
-        cls.CLOCK_FREQ = clock_freq
         return cls
 
     @classmethod
@@ -143,8 +140,8 @@ def test_GENERIC_UART_TX_synthesis():
 
 @pytest.mark.testcases
 def test_GENERIC_UART_TX_testcases():
-    """Run testcases for GENERIC_UART_TX_WRAPPER with different parameters"""
-    uart = GENERIC_UART_TX.configure(data_bits=8, baud_rate=9600, clock_freq=100_000_000)
+    """Run testcases for GENERIC_UART_TX with different parameters"""
+    uart = GENERIC_UART_TX.configure(data_bits=8)
     uart.test_with(tb_uart_tx_single_byte)
     uart.test_with(tb_uart_tx_idle_line)
     uart.test_with(tb_uart_tx_ready_signal)
