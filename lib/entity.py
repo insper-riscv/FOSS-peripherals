@@ -52,11 +52,14 @@ class Entity(T.Type[cocotb.handle.HierarchyObject]):
                 for key in dir(dut)
                 if not key.startswith("_")
                 and key != "clock"
+                and key != "clk"
                 and isinstance(getattr(dut, key), cocotb.handle.ModifiableObject)
             ]
 
             if hasattr(dut, "clock"):
                 tracer = Waveform(*signals, clock=dut.clock, model=cls) # type: ignore
+            elif hasattr(dut, "clk"):
+                tracer = Waveform(*signals, clock=dut.clk, model=cls) # type: ignore
             else:
                 tracer = Waveform(*signals, clock=None, model=cls) # type: ignore
 
