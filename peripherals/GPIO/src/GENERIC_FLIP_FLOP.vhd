@@ -2,13 +2,12 @@
 -- Entity: GENERIC_FLIP_FLOP
 -- Description: Standard D flip-flop with synchronous clear and enable.
 --              When clear is '1', output is reset to '0'.
---              When enable is '1', source is loaded into state.
+--              When enable is '1', source is loaded into internal state.
+--              Destination is continuously driven by internal state.
 -- =============================================================================
 
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
-
-library WORK;
 
 -- -----------------------------------------------------------------------------
 -- Entity Declaration
@@ -28,7 +27,7 @@ entity GENERIC_FLIP_FLOP is
         source : in  std_logic;
 
         -- Flip-flop output (registered value)
-        destination  : out std_logic
+        destination : out std_logic
     );
 end entity GENERIC_FLIP_FLOP;
 
@@ -36,6 +35,8 @@ end entity GENERIC_FLIP_FLOP;
 -- Architecture Definition
 -- -----------------------------------------------------------------------------
 architecture RTL of GENERIC_FLIP_FLOP is
+    -- Internal signal holding the registered state
+    signal state : std_logic;
 begin
 
     -- Synchronous process triggered on rising clock edge
@@ -44,11 +45,14 @@ begin
         if rising_edge(clock) then
             -- Priority: clear has precedence over enable
             if clear = '1' then
-                destination <= '0';
+                state <= '0';
             elsif enable = '1' then
-                destination <= source;
+                state <= source;
             end if;
         end if;
     end process;
 
-end architecture;
+    -- Output continuously assigned to internal state
+    destination <= state;
+
+end architecture RTL;

@@ -1,37 +1,58 @@
+-- =============================================================================
+-- Entity: GENERIC_FLIP_FLOP
+-- Description: Standard D flip-flop with synchronous clear and enable.
+--              When clear is '1', output is reset to '0'.
+--              When enable is '1', source is loaded into internal state.
+--              Destination is continuously driven by internal state.
+-- =============================================================================
+
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
-library WORK;
-
+-- -----------------------------------------------------------------------------
+-- Entity Declaration
+-- -----------------------------------------------------------------------------
 entity GENERIC_FLIP_FLOP is
-
     port (
+        -- Clock signal (rising-edge triggered)
         clock  : in  std_logic;
-        clear  : in  std_logic := '1';
-        enable : in  std_logic := 'X';
-        source : in  std_logic := 'X';
-        state  : out std_logic := '0'
+
+        -- Synchronous clear: when '1', resets output to '0'
+        clear  : in  std_logic;
+
+        -- Enable signal: when '1' and clear is '0', state <= source
+        enable : in  std_logic;
+
+        -- Input data to be stored
+        source : in  std_logic;
+
+        -- Flip-flop output (registered value)
+        destination : out std_logic
     );
+end entity GENERIC_FLIP_FLOP;
 
-end entity;
-
+-- -----------------------------------------------------------------------------
+-- Architecture Definition
+-- -----------------------------------------------------------------------------
 architecture RTL of GENERIC_FLIP_FLOP is
-
-    -- No signals
-
+    -- Internal signal holding the registered state
+    signal state : std_logic;
 begin
 
+    -- Synchronous process triggered on rising clock edge
     UPDATE : process(clock)
     begin
-        if (rising_edge(clock)) then
-            if (enable = '1') then
-                if (clear = '1') then
-                    state <= '0';
-                else
-                    state <= source;
-                end if;
+        if rising_edge(clock) then
+            -- Priority: clear has precedence over enable
+            if clear = '1' then
+                state <= '0';
+            elsif enable = '1' then
+                state <= source;
             end if;
         end if;
     end process;
 
-end architecture;
+    -- Output continuously assigned to internal state
+    destination <= state;
+
+end architecture RTL;

@@ -92,7 +92,7 @@ begin
   wr_en(WR_IRQ_MASK_I)  <= write when address = ADDR_WR_IRQ_MASK  else '0';
   wr_en(WR_RISE_MASK_I) <= write when address = ADDR_WR_RISE_MASK else '0';
   wr_en(WR_FALL_MASK_I) <= write when address = ADDR_WR_FALL_MASK else '0';
-  wr_en(WR_IRQ_CLR_I)   <= write when address = ADDR_RD_IRQ_STAT   else '0';
+  wr_en(WR_IRQ_CLR_I)   <= '1' when address = ADDR_RD_IRQ_STAT   else '0';
 
   -- -----------------------------------------------------------------------------
   -- GPIO OUTPUT OPERATION: multiplexer selector (wr_op)

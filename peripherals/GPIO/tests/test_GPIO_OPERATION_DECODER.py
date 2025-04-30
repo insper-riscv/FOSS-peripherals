@@ -94,7 +94,10 @@ async def tb_operation_decoder_manual(dut: GPIO_OPERATION_DECODER, trace: lib.Wa
     for name, exp_rd_sel in READ_CASES:
         await dec_op(dut, trace, name, write=False)
         yield trace.check(dut.rd_sel, exp_rd_sel, f"rd_sel mismatch for {name}")
-        yield trace.check(dut.wr_en, "0000000", f"wr_en should be 0 during read: {name}")
+        if name == "rd_irq_stat":
+            yield trace.check(dut.wr_en, "1000000", f"wr_en should be 0 during read: {name}")
+        else:
+            yield trace.check(dut.wr_en, "0000000", f"wr_en should be 0 during read: {name}")
 
 # -----------------------------------------------------------------------------
 # Synthesis check

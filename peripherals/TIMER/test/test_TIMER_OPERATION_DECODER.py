@@ -1,97 +1,156 @@
-import cocotb
-from cocotb.triggers import RisingEdge
-from cocotb.binary import BinaryValue
-import random
+# test_TIMER_OPERATION_DECODER.py
+# ============================================================================
+# Functional test-bench for the VHDL entity: TIMER_OPERATION_DECODER
+# ============================================================================
+
 import pytest
 import lib
+from test_GENERICS_package import GENERICS
+from cocotb.binary import BinaryValue
 
-
+# -----------------------------------------------------------------------------
+# Toplevel - VHDL wrapper
+# -----------------------------------------------------------------------------
 class TIMER_OPERATION_DECODER(lib.Entity):
-    """
-    Class representing the TIMER_OPERATION_DECODER module.
-    """
-    address = lib.Entity.Input_pin
-    write = lib.Entity.Input_pin
-    start_counter = lib.Entity.Output_pin
-    op_counter = lib.Entity.Output_pin
-    load_reset_value = lib.Entity.Output_pin
-    read_op = lib.Entity.Output_pin
+    """Connects the TIMER_OPERATION_DECODER VHDL entity to the Python test-bench."""
+    _package = GENERICS
 
+    # Inputs
+    address = lib.Entity.Input_pin   # std_logic_vector(3 downto 0)
+    write   = lib.Entity.Input_pin   # std_logic
+    read    = lib.Entity.Input_pin   # std_logic
 
-# Basic Functional Test
+    # Outputs
+    wr_en   = lib.Entity.Output_pin  # std_logic_vector(8 downto 0)
+    cnt_sel = lib.Entity.Output_pin  # std_logic
+    rd_sel  = lib.Entity.Output_pin  # std_logic_vector(2 downto 0)
+
+# -----------------------------------------------------------------------------
+# Address map -- must match exactly the VHDL decoder constants
+# -----------------------------------------------------------------------------
+ADDR = {
+    # WRITE addresses
+    "wr_start_stop": "0000",
+    "wr_mode":       "0001",
+    "wr_pwm_en":     "0010",
+    "wr_load_timer": "0011",
+    "wr_load_top":   "0100",
+    "wr_load_duty":  "0101",
+    "wr_irq_mask":   "0110",
+    "wr_reset":      "0111",
+
+    # READ addresses
+    "rd_timer":      "1000",
+    "rd_top":        "1001",
+    "rd_duty":       "1010",
+    "rd_configs":    "1011",
+    "rd_pwm":        "1100",
+    "rd_ovf_status": "1101",
+
+    # Anything else → NOP / RESERVED
+    "nop":           "1111",
+}
+
+# -----------------------------------------------------------------------------
+# Drive address + strobes for one clock cycle
+#   - dut: the DUT instance (TIMER_OPERATION_DECODER)
+#   - trace: the waveform trace object (lib.Waveform)
+#   - op: operation name (string) to be used for the address
+# -----------------------------------------------------------------------------
+async def dec_op(dut, trace, op: str, *, is_write: bool, is_read: bool):
+    """Drives address + strobes for one clock cycle."""
+    dut.address.value = BinaryValue(ADDR[op], n_bits=4)
+    dut.write.value   = BinaryValue('1' if is_write else '0')
+    dut.read.value    = BinaryValue('1' if is_read else '0')
+    await trace.cycle()            # apply for exactly one cycle
+    dut.write.value   = BinaryValue('0')
+    dut.read.value    = BinaryValue('0')
+
+# -----------------------------------------------------------------------------
+# Expected results for WRITE-accesses
+#   tuple: (operation-name, wr_en_bit_index, expected_cnt_sel)
+# -----------------------------------------------------------------------------
+WRITE_CASES = [
+    ("wr_start_stop", 0, 0),
+    ("wr_mode",       1, 0),
+    ("wr_pwm_en",     2, 0),
+    ("wr_load_timer", 3, 1),  # cnt_sel must pulse high on this write
+    ("wr_load_top",   4, 0),
+    ("wr_load_duty",  5, 0),
+    ("wr_irq_mask",   6, 0),
+    ("wr_reset",      8, 0),
+]
+
+# -----------------------------------------------------------------------------
+# Expected results for READ-accesses
+#   tuple: (operation-name, expected_rd_sel)
+# -----------------------------------------------------------------------------
+READ_CASES = [
+    ("rd_timer",      "000"),
+    ("rd_top",        "001"),
+    ("rd_duty",       "010"),
+    ("rd_configs",    "011"),
+    ("rd_pwm",        "100"),
+    ("rd_ovf_status", "101"),  # should also pulse wr_en(7)
+    ("nop",           "111"),
+]
+
+# -----------------------------------------------------------------------------
+# Functional verification
+# -----------------------------------------------------------------------------
 @TIMER_OPERATION_DECODER.testcase
-async def tb_TIMER_OPERATION_DECODER_case_1(dut: TIMER_OPERATION_DECODER, trace: lib.Waveform):
-    """
-    Basic test for TIMER_OPERATION_DECODER verifying outputs for known addresses.
-    """
-    test_vectors = [
-        # address, write, expected_start, expected_reset, expected_op, expected_read
-        ("0000", '1', '1', '0', "00", '0'),  # Start
-        ("0001", '1', '0', '1', "00", '0'),  # Load Reset Value
-        ("0010", '0', '0', '0', "01", '0'),  # Load
-        ("0011", '0', '0', '0', "10", '0'),  # Reset
-        ("0100", '0', '0', '0', "00", '1'),  # Read Overflow
-        ("0101", '0', '0', '0', "00", '0'),  # Read Default
-        ("1111", '1', '0', '0', "00", '0'),  # No-op
-    ]
+async def tb_timer_operation_decoder_manual(dut: TIMER_OPERATION_DECODER, trace: lib.Waveform):
+    """Verifies write-decoding, read-decoding, and cnt_sel behaviour."""
 
-    for i, (addr, wr, start, reset, op, read) in enumerate(test_vectors, start=1):
-        dut.address.value = BinaryValue(addr)
-        dut.write.value = int(wr)  # ← correção aqui
-        await trace.cycle()
+    # ------------------------
+    # WRITE decoding
+    # ------------------------
+    for name, bit_i, exp_cnt in WRITE_CASES:
+        # Apply the WRITE operation
+        await dec_op(dut, trace, name, is_write=True, is_read=False)
 
-        yield trace.check(dut.start_counter, start, f"Test #{i}: address={addr}, write={wr}")
-        yield trace.check(dut.load_reset_value, reset, f"Test #{i}: address={addr}, write={wr}")
-        yield trace.check(dut.op_counter, op, f"Test #{i}: address={addr}")
-        yield trace.check(dut.read_op, read, f"Test #{i}: address={addr}")
+        exp_wr_en = format(1 << bit_i, "09b")
+        # wr_en must match the address map
+        yield trace.check(dut.wr_en, exp_wr_en, f"wr_en mismatch for WRITE op: {name}")
+        # cnt_sel must pulse high on wr_load_timer (bit-3)
+        yield trace.check(dut.cnt_sel, str(exp_cnt), f"cnt_sel mismatch for WRITE op: {name}")
 
+    # ------------------------
+    # READ decoding
+    # ------------------------
+    for name, exp_rd_sel in READ_CASES:
+        # Apply the READ operation
+        await dec_op(dut, trace, name, is_write=False, is_read=True)
 
-# Randomized Stress Test
-@TIMER_OPERATION_DECODER.testcase
-async def tb_TIMER_OPERATION_DECODER_random(dut: TIMER_OPERATION_DECODER, trace: lib.Waveform):
-    """
-    Random test for TIMER_OPERATION_DECODER using random address and write combinations.
-    """
-    trace.disable()
+        # rd_sel must match the address map
+        yield trace.check(dut.rd_sel, exp_rd_sel, f"rd_sel mismatch for READ op: {name}")
 
-    for i in range(100):
-        addr_int = random.randint(0, 15)
-        addr = format(addr_int, '04b')
-        wr = random.choice(['0', '1'])
+        # wr_en pulses only on rd_ovf_status (bit-7)
+        if name == "rd_ovf_status":
+            yield trace.check(dut.wr_en, "010000000","wr_en(7) should pulse during rd_ovf_status")
+        else:
+            yield trace.check(dut.wr_en, "000000000",f"wr_en should be 0 during READ op: {name}")
 
-        dut.address.value = BinaryValue(addr)
-        dut.write.value = int(wr)  # ← correção aqui
-        await trace.cycle()
+        # cnt_sel must stay low on all pure READs
+        yield trace.check(dut.cnt_sel, "0", f"cnt_sel should be 0 during READ op: {name}")
 
-        expected_start = '1' if addr == "0000" and wr == '1' else '0'
-        expected_reset = '1' if addr == "0001" and wr == '1' else '0'
-        expected_op = "01" if addr == "0010" else "10" if addr == "0011" else "00"
-        expected_read = '1' if addr == "0100" else '0'
-
-        yield trace.check(dut.start_counter, expected_start, f"[Rand #{i}] addr={addr}, write={wr}")
-        yield trace.check(dut.load_reset_value, expected_reset, f"[Rand #{i}] addr={addr}, write={wr}")
-        yield trace.check(dut.op_counter, expected_op, f"[Rand #{i}] addr={addr}")
-        yield trace.check(dut.read_op, expected_read, f"[Rand #{i}] addr={addr}")
-
-
-# Synthesis Verification
+# -----------------------------------------------------------------------------
+# Synthesis (lint / elaboration) smoke-check
+# -----------------------------------------------------------------------------
 @pytest.mark.synthesis
 def test_TIMER_OPERATION_DECODER_synthesis():
     TIMER_OPERATION_DECODER.build_vhd()
+    TIMER_OPERATION_DECODER.build_netlistsvg()
 
-
-# Register Functional Tests
+# -----------------------------------------------------------------------------
+# Test-run wrapper for pytest
+# -----------------------------------------------------------------------------
 @pytest.mark.testcases
-def test_TIMER_OPERATION_DECODER_testcases():
-    TIMER_OPERATION_DECODER.test_with(tb_TIMER_OPERATION_DECODER_case_1)
+def test_timer_operation_decoder_manual():
+    TIMER_OPERATION_DECODER.test_with(tb_timer_operation_decoder_manual)
 
-
-# Register Stress Tests
-@pytest.mark.coverage
-def test_TIMER_OPERATION_DECODER_stress():
-    TIMER_OPERATION_DECODER.test_with(tb_TIMER_OPERATION_DECODER_random)
-
-
-# Manual Execution Entry
+# -----------------------------------------------------------------------------
+# Stand-alone entry-point (optional)
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     lib.run_test(__file__)
