@@ -4,7 +4,7 @@ use IEEE.NUMERIC_STD.ALL;
 
 entity generic_uart_rx is
     generic (
-        DATA_BITS : integer := 8;
+        DATA_BITS : integer := 8
     );
     port (
         clk            : in  std_logic;

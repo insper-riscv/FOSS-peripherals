@@ -14,7 +14,7 @@ entity generic_baud_generator is
     );
 end entity generic_baud_generator;
 
-architecture Behavioral of baud_generator is
+architecture Behavioral of generic_baud_generator is
     signal counter : unsigned(COUNTER_WIDTH downto 0) := (others => '0');
 begin
     process(clk)
