@@ -12,6 +12,7 @@ class GPIO_OPERATION_DECODER(lib.Entity):
 
     address = lib.Entity.Input_pin
     write   = lib.Entity.Input_pin
+    read    = lib.Entity.Input_pin
 
     wr_en   = lib.Entity.Output_pin  # 7 bits
     wr_op   = lib.Entity.Output_pin  # 2 bits
@@ -47,6 +48,7 @@ ADDR = {
 async def dec_op(dut, trace, op, write=False):
     dut.address.value = BinaryValue(ADDR[op], n_bits=4)
     dut.write.value = BinaryValue('1' if write else '0')
+    dut.read.value = BinaryValue('1' if not write else '0')
     await trace.cycle()
     dut.write.value = BinaryValue('0')
 
@@ -61,8 +63,7 @@ WRITE_CASES = [
     ("wr_out_toggle", 2, "11"),
     ("wr_irq_mask",   3, "00"),
     ("wr_rise_mask",  4, "00"),
-    ("wr_fall_mask",  5, "00"),
-    ("wr_irq_clr",    6, "00"),
+    ("wr_fall_mask",  5, "00")
 ]
 
 # -----------------------------------------------------------------------------

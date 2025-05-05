@@ -83,8 +83,8 @@ architecture RTL of GPIO is
     -----------------------------------------------------------------------------
     -- Internal Signal for Readback Multiplexer
     -----------------------------------------------------------------------------
-    signal selected_read : std_logic_vector(DATA_WIDTH-1 downto 0);
-
+    signal selected_read : std_logic_vector(DATA_WIDTH-1 downto 0); -- Readback data
+    constant ZERO_VECTOR : std_logic_vector(DATA_WIDTH-1 downto 0) := (others => '0'); -- Zero vector for unused readback
 begin
 
     -----------------------------------------------------------------------------
@@ -94,6 +94,7 @@ begin
         port map (
             address => address,
             write   => write,
+            read    => read,
             wr_en   => wr_en,
             wr_op   => wr_op,
             rd_sel  => rd_sel
@@ -133,20 +134,21 @@ begin
         )
         port map (
             selector    => rd_sel,
-            source_0    => dir_reg,
-            source_1    => out_reg,
-            source_2    => pins_input,
-            source_3    => irq_mask,
-            source_4    => irq_rise_mask,
-            source_5    => irq_fall_mask,
-            source_6    => irq_status,
-            source_7    => (others => '0'),
+            source_1    => dir_reg,
+            source_2    => out_reg,
+            source_3    => pins_input,
+            source_4    => irq_mask,
+            source_5    => irq_rise_mask,
+            source_6    => irq_fall_mask,
+            source_7    => irq_status,
+            source_8    => ZERO_VECTOR,
             destination => selected_read
         );
+    data_out <= selected_read;
     -----------------------------------------------------------------------------
     -- Interrupt Generation Logic. 
     -- IRQ is asserted if any of the interrupt status bits are set (Reduce Or Operation).
     -----------------------------------------------------------------------------
-    irq <= '1' when irq_status /= (others => '0') else '0';
+    irq <= '1' when irq_status /= ZERO_VECTOR else '0';
 
 end architecture;

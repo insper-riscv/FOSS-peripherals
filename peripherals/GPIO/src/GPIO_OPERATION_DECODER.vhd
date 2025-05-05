@@ -15,6 +15,7 @@ entity GPIO_OPERATION_DECODER is
     -- Bus interface
     address : in  std_logic_vector(3 downto 0);
     write   : in  std_logic;
+    read    : in  std_logic;
 
     -- Vector of write enables (see bit map below)
     wr_en   : out std_logic_vector(6 downto 0);
@@ -92,7 +93,7 @@ begin
   wr_en(WR_IRQ_MASK_I)  <= write when address = ADDR_WR_IRQ_MASK  else '0';
   wr_en(WR_RISE_MASK_I) <= write when address = ADDR_WR_RISE_MASK else '0';
   wr_en(WR_FALL_MASK_I) <= write when address = ADDR_WR_FALL_MASK else '0';
-  wr_en(WR_IRQ_CLR_I)   <= '1' when address = ADDR_RD_IRQ_STAT   else '0';
+  wr_en(WR_IRQ_CLR_I)   <= read when address = ADDR_RD_IRQ_STAT   else '0';
 
   -- -----------------------------------------------------------------------------
   -- GPIO OUTPUT OPERATION: multiplexer selector (wr_op)

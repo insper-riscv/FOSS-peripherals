@@ -1,13 +1,15 @@
 '''
+# =========================== GPIO – OUTPUT‑MODE TEST ===========================
 import pytest
-from cocotb.binary import BinaryValue
 import lib
-import random
-
 from test_GENERICS_package import GENERICS
+from cocotb.binary import BinaryValue
 
+# -----------------------------------------------------------------------------
+# DUT wrapper
+# -----------------------------------------------------------------------------
 class GPIO(lib.Entity):
-    _package = GENERICS
+    _package = GENERICS                # generic helper
 
     clock     = lib.Entity.Input_pin
     clear     = lib.Entity.Input_pin
@@ -15,151 +17,130 @@ class GPIO(lib.Entity):
     address   = lib.Entity.Input_pin
     write     = lib.Entity.Input_pin
     read      = lib.Entity.Input_pin
-    data_out  = lib.Entity.Output_pin
-    gpio_pins = lib.Entity.Output_pin  # inout no HDL, tratado como output no testbench
 
+    data_out  = lib.Entity.Output_pin
+    irq       = lib.Entity.Output_pin
+    gpio_pins = lib.Entity.Output_pin   # DUT drives the pins in this test
+
+# -----------------------------------------------------------------------------
+# Address map (matches VHDL decoder)
+# -----------------------------------------------------------------------------
 ADDR = {
-    "write_dir":     "000",
-    "write_out_load":"001",
-    "write_out_set": "010",
-    "write_out_clear":"011",
-    "toggle":        "100",
-    "read_dir":      "101",
-    "read_out":      "110",
-    "read_external": "111"
+    "wr_dir":        "0000",
+    "wr_out_load":   "0001",
+    "wr_out_set":    "0010",
+    "wr_out_clear":  "0011",
+    "wr_out_toggle": "0100",
+    "rd_dir":        "1000",
+    "rd_out":        "1001",
 }
 
-# Função auxiliar para executar operação GPIO
-async def gpio_op(dut, trace, op, data_in=None, write=False, read=False):
-    dut.address.value = BinaryValue(ADDR[op], n_bits=3)
-    dut.write.value = BinaryValue('1' if write else '0')
-    dut.read.value  = BinaryValue('1' if read else '0')
-    if data_in is not None:
-        if isinstance(data_in, int):
-            dut.data_in.value = BinaryValue(format(data_in, '032b'))
-        else:
-            dut.data_in.value = BinaryValue(data_in, n_bits=32)
-    await trace.cycle()
-    dut.write.value = BinaryValue('0')
-    dut.read.value  = BinaryValue('0')
+# -----------------------------------------------------------------------------
+# Helper utilities ------------------------------------------------------------
+# -----------------------------------------------------------------------------
+def bin_val(value: int, width: int) -> BinaryValue:
+    return BinaryValue(format(value, f"0{width}b"))
 
+async def bus_write(dut, trace, addr_key: str, data: int):
+    width = len(dut.data_in)
+    dut.address.value = BinaryValue(ADDR[addr_key])
+    dut.data_in.value = bin_val(data, width)
+    dut.write.value   = BinaryValue("1")
+    await trace.cycle()
+    dut.write.value   = BinaryValue("0")
+    dut.data_in.value = bin_val(0, width)          # drive zeros of correct width
+
+async def bus_read(dut, trace, addr_key: str):
+    """Performs a read; data appears on dut.data_out the cycle after read strobe."""
+    dut.address.value = BinaryValue(ADDR[addr_key])
+    dut.read.value    = BinaryValue("1")
+    await trace.cycle()
+    dut.read.value    = BinaryValue("0")
+
+# -----------------------------------------------------------------------------
+# Test‑case -------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 @GPIO.testcase
-async def tb_gpio_alternating_patterns(dut: GPIO, trace: lib.Waveform):
-    #Edge Case. Checa se pinos e saída estão em alta impedância 
-    yield trace.check(dut.data_out, "Z" * 32, "Direção deve estar toda em Z")
-    yield trace.check(dut.gpio_pins, "Z" * 32, "Direção deve estar toda em Z")
-    dut.clear.value = BinaryValue('1')
+async def tb_gpio_output(dut: GPIO, trace: lib.Waveform):
+    """Drives the top-level GPIO in OUTPUT mode and checks datapath + readback."""
+    WIDTH = len(dut.data_in)
+    HALF = WIDTH // 2
+
+    # Reset
+    dut.clear.value = BinaryValue("1")
     await trace.cycle()
-    dut.clear.value = BinaryValue('0')
+    dut.clear.value = BinaryValue("0")
 
-    # Define direção de todos os bits como saída
-    await gpio_op(dut, trace, "write_dir", data_in=0xFFFFFFFF, write=True)
+    # DIR → OUTPUT (only lower half enabled)
+    dir_mask = (1 << HALF) - 1  # 0x00FF for WIDTH=16
+    await bus_write(dut, trace, "wr_dir", dir_mask)
+    await bus_read(dut, trace, "rd_dir")
+    yield trace.check(dut.data_out, format(dir_mask, f"0{WIDTH}b"), "DIR should be lower half only")
+    yield trace.check(dut.gpio_pins, ("0" * HALF + "Z" * HALF)[::-1], "Pins: lower LOW, upper Z")
 
-    # Lê direção e verifica se todos os bits estão setados
-    await gpio_op(dut, trace, "read_dir", read=True)
-    yield trace.check(dut.data_out, "1" * 32, "Direção deve estar toda em 1")
+    # LOAD 0x0
+    await bus_write(dut, trace, "wr_out_load", 0)
+    await bus_read(dut, trace, "rd_out")
+    yield trace.check(dut.data_out, "0" * WIDTH, "OUT = 0 after LOAD")
+    yield trace.check(dut.gpio_pins, ("0" * HALF + "Z" * HALF)[::-1], "Pins LOW (lower), Z (upper)")
 
-    # Padrão 1: Alternado A (101010...)
-    pattern1 = 0xAAAAAAAA
-    await gpio_op(dut, trace, "write_out_load", data_in=pattern1, write=True)
+    # SET pattern 0b0101...
+    pattern_set = int("01" * HALF, 2)
+    await bus_write(dut, trace, "wr_out_set", pattern_set)
+    await bus_read(dut, trace, "rd_out")
+    expected_set = format(pattern_set, f"0{WIDTH}b")
+    yield trace.check(dut.data_out, expected_set, "OUT after SET")
+    yield trace.check(dut.gpio_pins, "Z" * HALF + expected_set[-HALF:], "Pins reflect SET (lower half)")
 
-    await gpio_op(dut, trace, "read_out", read=True)
-    yield trace.check(dut.data_out, format(pattern1, '032b'), "Saída deve conter padrão A (0xAAAAAAAA)")
-    yield trace.check(dut.gpio_pins, format(pattern1, '032b'), "GPIO deve refletir padrão A")
+    # CLEAR bit 1
+    await bus_write(dut, trace, "wr_out_clear", 1 << 1)
+    await bus_read(dut, trace, "rd_out")
+    expected_clear = list(expected_set)
+    expected_clear[-2] = '0'
+    expected_clear = ''.join(expected_clear)
+    yield trace.check(dut.data_out, expected_clear, "Bit 1 cleared")
+    yield trace.check(dut.gpio_pins, "Z" * HALF + expected_clear[-HALF:], "Pins reflect CLEAR")
 
-    # Toggle: deve inverter todos os bits de padrão1 → padrão2 (010101...)
-    await gpio_op(dut, trace, "toggle", data_in=0xFFFFFFFF, write=True)
+    # TOGGLE
+    toggle_mask = 0xF
+    await bus_write(dut, trace, "wr_out_toggle", toggle_mask)
+    await bus_read(dut, trace, "rd_out")
+    toggled = int(expected_clear, 2) ^ toggle_mask
+    expected_toggle = format(toggled, f"0{WIDTH}b")
+    yield trace.check(dut.data_out, expected_toggle, "Toggle applied")
+    yield trace.check(dut.gpio_pins, "Z" * HALF + expected_toggle[-HALF:], "Pins reflect TOGGLE")
 
-    expected_toggle = pattern1 ^ 0xFFFFFFFF  # deve ser 0x55555555
-    await gpio_op(dut, trace, "read_out", read=True)
-    yield trace.check(dut.data_out, format(expected_toggle, '032b'), "Saída deve ter sido invertida (0x55555555)")
-    yield trace.check(dut.gpio_pins, format(expected_toggle, '032b'), "GPIO deve refletir padrão invertido")
-
-    # Clear bits com padrão alternado (zera bits 1, 3, 5, ...)
-    await gpio_op(dut, trace, "write_out_clear", data_in=0xAAAAAAAA, write=True)
-
-    cleared = expected_toggle & ~0xAAAAAAAA
-    await gpio_op(dut, trace, "read_out", read=True)
-    yield trace.check(dut.data_out, format(cleared, '032b'), "Saída deve ter bits A zerados")
-    yield trace.check(dut.gpio_pins, format(cleared, '032b'), "GPIO deve refletir bits A zerados")
-
-    # Set bits alternados novamente (bits 1, 3, 5, ...)
-    await gpio_op(dut, trace, "write_out_set", data_in=0xAAAAAAAA, write=True)
-
-    final = cleared | 0xAAAAAAAA
-    await gpio_op(dut, trace, "read_out", read=True)
-    yield trace.check(dut.data_out, format(final, '032b'), "Saída deve restaurar padrão A")
-    yield trace.check(dut.gpio_pins, format(final, '032b'), "GPIO deve refletir padrão A novamente")
+    # IRQ must remain LOW
+    yield trace.check(dut.irq, "0", "IRQ must stay low in output test")
 
 
-# Teste de estresse com operações aleatórias
-@GPIO.testcase
-async def tb_gpio_stress(dut: GPIO, trace: lib.Waveform):
-    yield trace.check(dut.data_out, "Z" * 32, "Direção deve estar toda em Z")
-    yield trace.check(dut.gpio_pins, "Z" * 32, "Direção deve estar toda em Z")
-    dut.clear.value = BinaryValue('1')
-    await trace.cycle()
-    dut.clear.value = BinaryValue('0')
 
-    await gpio_op(dut, trace, "write_dir", data_in=0xFFFFFFFF, write=True)
 
-    expected_value = 0
-
-    for i in range(100):
-        op = random.choice(["write_out_load", "write_out_set", "write_out_clear", "toggle"])
-        data = random.getrandbits(32)
-
-        if op == "write_out_load":
-            await gpio_op(dut, trace, op, data_in=data, write=True)
-            expected_value = data
-        elif op == "write_out_set":
-            await gpio_op(dut, trace, op, data_in=data, write=True)
-            expected_value |= data
-        elif op == "write_out_clear":
-            await gpio_op(dut, trace, op, data_in=data, write=True)
-            expected_value &= ~data & 0xFFFFFFFF
-        elif op == "toggle":
-            await gpio_op(dut, trace, op, data_in=data, write=True)
-            expected_value ^= data
-
-        await gpio_op(dut, trace, "read_out", read=True)
-        yield trace.check(
-            dut.data_out,
-            format(expected_value, '032b'),
-            f"[{i}] Esperado data_out = {hex(expected_value)} após {op.upper()}"
-        )
-        yield trace.check(
-            dut.gpio_pins,
-            format(expected_value, '032b'),
-            f"[{i}] gpio_pins deve ser {hex(expected_value)} após {op.upper()}"
-        )
-
-# Síntese
+# -----------------------------------------------------------------------------
+# Synthesis / CI hooks --------------------------------------------------------
+# -----------------------------------------------------------------------------
 @pytest.mark.synthesis
-def test_GPIO_synthesis():
+def test_GPIO_synth():
     GPIO.build_vhd()
 
-# Teste fixo
 @pytest.mark.testcases
-def test_gpio_basic():
-    GPIO.test_with(tb_gpio_alternating_patterns)
-
-# Teste estresse
-@pytest.mark.coverage
-def test_gpio_stress():
-    GPIO.test_with(tb_gpio_stress)
+def test_gpio_output():
+    GPIO.test_with(tb_gpio_output)
 
 if __name__ == "__main__":
     lib.run_test(__file__)'''
 
 import pytest
-from cocotb.binary import BinaryValue
 import lib
 from test_GENERICS_package import GENERICS
+from cocotb.binary import BinaryValue
 
-# Assuming the same base class for the GPIO
+# ----------------------------------------------------------------------------
+# Wrapper: GPIO top-level peripheral
+# ----------------------------------------------------------------------------
 class GPIO(lib.Entity):
     _package = GENERICS
+    _generics = dict(DATA_WIDTH=32)
 
     clock     = lib.Entity.Input_pin
     clear     = lib.Entity.Input_pin
@@ -167,100 +148,112 @@ class GPIO(lib.Entity):
     address   = lib.Entity.Input_pin
     write     = lib.Entity.Input_pin
     read      = lib.Entity.Input_pin
+
     data_out  = lib.Entity.Output_pin
-    gpio_pins = lib.Entity.Input_pin  
+    irq       = lib.Entity.Output_pin
+    gpio_pins = lib.Entity.Input_pin  # TB drives the input pins
 
-
-# GPIO Address mapping 
+# ----------------------------------------------------------------------------
+# Address map
+# ----------------------------------------------------------------------------
 ADDR = {
-    "write_dir":     "000",
-    "write_out_load":"001",
-    "write_out_set": "010",
-    "write_out_clear":"011",
-    "toggle":        "100",
-    "read_dir":      "101",
-    "read_out":      "110",
-    "read_external": "111",
+    "wr_dir":        "0000",
+    "wr_irq_mask":   "0101",
+    "wr_rise_mask":  "0110",
+    "wr_fall_mask":  "0111",
+    "rd_pins":       "1010",
+    "rd_irq_stat":   "1011",
 }
 
+# ----------------------------------------------------------------------------
+# Bus helpers
+# ----------------------------------------------------------------------------
+def bin32(val: int) -> BinaryValue:
+    return BinaryValue(format(val, "032b"))
 
-# Helper coroutine to do the operation
-async def gpio_op(dut, trace, op, data_in=None, write=False, read=False):
-    dut.address.value = BinaryValue(ADDR[op], n_bits=3)
-    dut.write.value   = BinaryValue('1' if write else '0')
-    dut.read.value    = BinaryValue('1' if read  else '0')
-
-    if data_in is not None:
-        # If data_in is int, convert to 32-bit binary string
-        if isinstance(data_in, int):
-            dut.data_in.value = BinaryValue(format(data_in, '032b'))
-        else:
-            # If already a string, make sure it's 32 bits
-            dut.data_in.value = BinaryValue(data_in, n_bits=32)
-
-    # Wait one cycle, then de-assert
+async def bus_write(dut, trace, addr_key, data):
+    dut.address.value = BinaryValue(ADDR[addr_key])
+    dut.data_in.value = bin32(data)
+    dut.write.value   = BinaryValue("1")
     await trace.cycle()
-    dut.write.value = BinaryValue('0')
-    dut.read.value  = BinaryValue('0')
+    dut.write.value   = BinaryValue("0")
+    dut.data_in.value = bin32(0)
+    await trace.cycle()
 
+async def bus_read(dut, trace, addr_key):
+    dut.address.value = BinaryValue(ADDR[addr_key])
+    dut.read.value    = BinaryValue("1")
+    await trace.cycle()
+    dut.read.value    = BinaryValue("0")
+    await trace.cycle()
 
-# A simple GPIO "read from pins" test
+# ----------------------------------------------------------------------------
+# Testcase
+# ----------------------------------------------------------------------------
 @GPIO.testcase
-async def tb_gpio_input_basic(dut: GPIO, trace: lib.Waveform):
-    """
-    1) Clear the design
-    2) Configure direction register = 0 (all inputs)
-    3) Drive external pins
-    4) Read from 'read_external' address
-    5) Check that data_out matches the external pins
-    """
-
-    # 1) Clear the design
-    dut.clear.value = BinaryValue('1')
+async def tb_gpio_input_irq(dut: GPIO, trace: lib.Waveform):
+    # Reset
+    dut.clear.value = BinaryValue("1")
     await trace.cycle()
-    dut.clear.value = BinaryValue('0')
+    dut.clear.value = BinaryValue("0")
 
-    # 2) Direction register = 0 -> all input bits
-    await gpio_op(dut, trace, "write_dir", data_in=0, write=True)
+    # Set all pins to input (dir=0)
+    await bus_write(dut, trace, "wr_dir", 0x00000000)
 
-    # Optional: Check the direction register read-back
-    await gpio_op(dut, trace, "read_dir", read=True)
-    yield trace.check(
-        dut.data_out,
-        "0"*32,
-        "All bits should be inputs (0 in direction register)."
-    )
+    # Enable all interrupts and edge masks
+    await bus_write(dut, trace, "wr_irq_mask",  0xFFFFFFFF)
+    await bus_write(dut, trace, "wr_rise_mask", 0xFFFFFFFF)
+    await bus_write(dut, trace, "wr_fall_mask", 0xFFFFFFFF)
 
-    # 3) Drive an external value
-    external_value = 0xABCD1234
-    dut.gpio_pins.value = BinaryValue(format(external_value, '032b'))
+    # Drive pins low, no IRQ should be raised
+    dut.gpio_pins.value = bin32(0x00000000)
+    for _ in range(3):
+        await trace.cycle()
+    yield trace.check(dut.irq, "0", "Initial LOW, no IRQ")
 
-    # 4) Read from 'read_external' address
-    # The design has a 2-stage synchronizer, so let's wait 2 cycles
-    dut.address.value = BinaryValue(ADDR["read_external"], n_bits=3)
-    dut.read.value    = BinaryValue('1')
-    await trace.cycle()  # first sync stage
-    await trace.cycle()  # second sync stage
+   # Rising edge on pin0
+    dut.gpio_pins.value = bin32(0x00000001)
+    for _ in range(3):
+        await trace.cycle()
+    yield trace.check(dut.irq, "1", "IRQ on rising edge")
 
-    # 5) Check data_out
-    # By this time, reg_input (the synchronizer output) should match external_value
-    yield trace.check(
-        dut.data_out,
-        format(external_value, '032b'),
-        "GPIO input readback should match the external pins."
-    )
+    # Clear IRQ
+    await bus_read(dut, trace, "rd_irq_stat")
+    await trace.cycle()
+    yield trace.check(dut.irq, "0", "IRQ cleared after read")
 
-    # Stop driving read
-    dut.read.value = BinaryValue('0')
+    # Extra cycle to update previous pin state
+    await trace.cycle()
+
+    # Falling edge on pin0
+    dut.gpio_pins.value = bin32(0x00000000)
+    for _ in range(3):
+        await trace.cycle()
+    yield trace.check(dut.irq, "1", "IRQ on falling edge")
 
 
+    # Clear IRQ
+    await bus_read(dut, trace, "rd_irq_stat")
+    await trace.cycle()
+    yield trace.check(dut.irq, "0", "IRQ cleared after second read")
+
+    # Disable global mask → no IRQs triggered
+    await bus_write(dut, trace, "wr_irq_mask", 0x00000000)
+    dut.gpio_pins.value = bin32(0x00000001)
+    for _ in range(3):
+        await trace.cycle()
+    yield trace.check(dut.irq, "0", "IRQ must stay low with mask=0")
+
+# ----------------------------------------------------------------------------
+# Pytest hooks
+# ----------------------------------------------------------------------------
 @pytest.mark.synthesis
-def test_GPIO_synthesis():
+def test_GPIO_synth():
     GPIO.build_vhd()
 
 @pytest.mark.testcases
-def test_input_basic():
-    GPIO.test_with(tb_gpio_input_basic)
+def test_gpio_input_irq():
+    GPIO.test_with(tb_gpio_input_irq)
 
 if __name__ == "__main__":
     lib.run_test(__file__)
