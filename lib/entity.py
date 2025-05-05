@@ -155,7 +155,12 @@ class Entity(T.Type[cocotb.handle.HierarchyObject]):
     @classmethod
     def build_vhd(cls):
         if cls._package is not None:
-            cls._package.build_vhd()
+            # Normalize to list
+            packages = cls._package \
+                if isinstance(cls._package, (list, tuple)) \
+                else [cls._package]
+            for pkg in packages:
+                pkg.build_vhd()
 
         for child in cls._get_children():
             child.build_vhd()
