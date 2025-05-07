@@ -1,23 +1,28 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 use IEEE.NUMERIC_STD.ALL;
+use work.types.all;
 
 entity generic_uart is
     generic (
         -- Peripheral parameters
         DATA_WIDTH             : integer := 32;
+
         -- UART parameters
         UART_DATA_BITS         : integer := 8;
-        COUNTER_WIDTH          : natural := 16
+        COUNTER_WIDTH          : natural := 16;
+
         -- Operation decoder parameters
         OP_WIDTH               : natural := 2;
         CONTROL_SIGNAL_WIDTH   : natural := 3;
-        MAPPING_NUM            : natural := 3;
-        OP_TO_CONTROL_MAP      : operation_mapping_matrix(0 to MAPPING_NUM-1, 0 to 1) := 
-        ( 
-            0 => (to_slv("00", OP_WIDTH-1 downto 0), to_slv("001", CONTROL_SIGNAL_WIDTH-1 downto 0)),
-            1 => (to_slv("01", OP_WIDTH-1 downto 0), to_slv("010", CONTROL_SIGNAL_WIDTH-1 downto 0)),
-            2 => (to_slv("10", OP_WIDTH-1 downto 0), to_slv("100", CONTROL_SIGNAL_WIDTH-1 downto 0))
+        OPERATION_CONTROL_SIGNAL_COUNT            : natural := 3;
+        OPERATION_TO_CONTROL_MAP : op_cs_map(0 to OPERATION_CONTROL_SIGNAL_COUNT-1) := (
+            0 => (op   => std_logic_vector(to_unsigned(0, OP_WIDTH)),
+                  ctrl => std_logic_vector(to_unsigned(1, CONTROL_SIGNAL_WIDTH))),
+            1 => (op   => std_logic_vector(to_unsigned(1, OP_WIDTH)),
+                  ctrl => std_logic_vector(to_unsigned(2, CONTROL_SIGNAL_WIDTH))),
+            2 => (op   => std_logic_vector(to_unsigned(2, OP_WIDTH)),
+                  ctrl => std_logic_vector(to_unsigned(4, CONTROL_SIGNAL_WIDTH)))
         );
         DEFAULT_CONTROL_SIGNAL : std_logic_vector(CONTROL_SIGNAL_WIDTH-1 downto 0) := (others => '0')
     );
@@ -36,7 +41,7 @@ entity generic_uart is
         tx_o        : out std_logic;
 
         -- Periferal (UART) Interupt
-        interrupt_o : out std_logic;
+        interrupt_o : out std_logic
     );
 end entity generic_uart;
 
@@ -63,19 +68,22 @@ architecture Structural of generic_uart is
     signal wr_rx_reg_strobe : std_logic;
     signal rd_rx_strobe     : std_logic;
     
-    wr_tx_strobe     <= wr_i and en_tx;
-    rd_rx_strobe     <= rd_i and en_rx;
-    wr_rx_reg_strobe <= rx_ready_o and en_rx;
+    signal rx_ready_o       : std_logic;
+    signal tx_ready_o       : std_logic;
+    signal parity_error_o   : std_logic;
 
 begin
+    wr_tx_strobe     <= wr_i and en_tx;
+    rd_rx_strobe     <= rd_rx_op;
+    wr_rx_reg_strobe <= rx_ready_o and en_rx;
 
     operation_decoder: entity work.generic_operation_decoder
         generic map (
-            OP_WIDTH               => OP_WIDTH,
-            CONTROL_SIGNAL_WIDTH   => CONTROL_SIGNAL_WIDTH,
-            MAPPING_NUM            => MAPPING_NUM,
-            OP_TO_CONTROL_MAP      => OP_TO_CONTROL_MAP,
-            DEFAULT_CONTROL_SIGNAL => DEFAULT_CONTROL_SIGNAL
+            OP_WIDTH                       => OP_WIDTH,
+            CONTROL_SIGNAL_WIDTH           => CONTROL_SIGNAL_WIDTH,
+            OPERATION_CONTROL_SIGNAL_COUNT => OPERATION_CONTROL_SIGNAL_COUNT,
+            OPERATION_TO_CONTROL_MAP       => OPERATION_TO_CONTROL_MAP,
+            DEFAULT_CONTROL_SIGNAL         => DEFAULT_CONTROL_SIGNAL
         )
         port map (
             operation      => operation,
@@ -127,7 +135,7 @@ begin
     -- UART TX
     tx_uart : entity work.generic_uart_tx
         generic map (
-            UART_DATA_BITS => UART_DATA_BITS
+            DATA_BITS => UART_DATA_BITS
         )
         port map (
             clk            => clk,
@@ -142,7 +150,7 @@ begin
     -- UART RX
     rx_uart : entity work.generic_uart_rx
         generic map (
-            UART_DATA_BITS => UART_DATA_BITS
+            DATA_BITS => UART_DATA_BITS
         )
         port map (
             clk            => clk,
