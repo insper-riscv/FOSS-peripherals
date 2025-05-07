@@ -9,13 +9,13 @@ entity generic_baud_generator is
     port (
       clk         : in  std_logic;
       reset       : in  std_logic;
-      baud_div_i  : in  unsigned(COUNTER_WIDTH downto 0);
+      baud_div_i  : in  unsigned(COUNTER_WIDTH-1 downto 0);
       tick        : out std_logic
     );
 end entity generic_baud_generator;
 
 architecture Behavioral of generic_baud_generator is
-    signal counter : unsigned(COUNTER_WIDTH downto 0) := (others => '0');
+    signal counter : unsigned(COUNTER_WIDTH-1 downto 0) := (others => '0');
 begin
     process(clk)
     begin
