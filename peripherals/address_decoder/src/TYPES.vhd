@@ -1,27 +1,36 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
+----------------------------------------------------------------------------------
+-- Address Decoder Types Package
+-- 
+-- Defines custom types and utility functions used by the address decoder
+-- components to handle memory mapping and peripheral communication.
+----------------------------------------------------------------------------------
+
 package types is
-  -- Vector of natural numbers
-  type natural_vector is array (natural range <>) of natural;
+  -- Vector of natural numbers (used for address ranges)
+  type NATURAL_ARRAY_T is array (natural range <>) of natural;
   
   -- Matrix of addresses (array of std_logic_vector)
-  type addr_matrix is array (natural range <>) of std_logic_vector;
+  type ADDR_MATRIX_T is array (natural range <>) of std_logic_vector;
   
   -- Matrix of data (for peripheral data inputs/outputs)
-  type data_matrix is array (natural range <>) of std_logic_vector;
+  type DATA_MATRIX_T is array (natural range <>) of std_logic_vector;
   
   -- Function to generate address masks based on peripheral address ranges
-  function generate_masks(ranges: natural_vector; addr_width: natural) return addr_matrix;
+  function generate_masks(ranges: NATURAL_ARRAY_T; addr_width: natural) return ADDR_MATRIX_T;
+  
   -- Function to convert std_logic_vector to string for debugging
   function to_string(slv: std_logic_vector) return string;
 end package types;
 
 package body types is
   -- Implementation of generate_masks function
-  function generate_masks(ranges: natural_vector; addr_width: natural)
-    return addr_matrix is
-    variable result: addr_matrix(ranges'range)(addr_width-1 downto 0);
+  -- Calculates bit masks for each peripheral's address range
+  function generate_masks(ranges: NATURAL_ARRAY_T; addr_width: natural)
+    return ADDR_MATRIX_T is
+    variable result: ADDR_MATRIX_T(ranges'range)(addr_width-1 downto 0);
     variable mask_bits: natural;
   begin
     for i in ranges'range loop
@@ -40,6 +49,8 @@ package body types is
     return result;
   end function;
   
+  -- Implementation of to_string function
+  -- Converts a std_logic_vector to a human-readable string
   function to_string(slv: std_logic_vector) return string is
     variable result: string(1 to slv'length);
   begin
