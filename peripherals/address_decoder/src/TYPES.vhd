@@ -8,6 +8,9 @@ package types is
   -- Matrix of addresses (array of std_logic_vector)
   type addr_matrix is array (natural range <>) of std_logic_vector;
   
+  -- Matrix of data (for peripheral data inputs/outputs)
+  type data_matrix is array (natural range <>) of std_logic_vector;
+  
   -- Function to generate address masks based on peripheral address ranges
   function generate_masks(ranges: natural_vector; addr_width: natural) return addr_matrix;
   -- Function to convert std_logic_vector to string for debugging
