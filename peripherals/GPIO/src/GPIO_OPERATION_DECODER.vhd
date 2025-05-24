@@ -44,7 +44,7 @@ architecture RTL of GPIO_OPERATION_DECODER is
   --    3  | WR_IRQ_MASK   – Global interrupt‑enable mask
   --    4  | WR_RISE_MASK  – Rising‑edge interrupt mask
   --    5  | WR_FALL_MASK  – Falling‑edge interrupt mask
-  --    6  | WR_IRQ_CLR    – Write‑1‑to‑clear interrupt status
+  --    6  | IRQ_CLR    – Reset interrupt status on IRQ Register read
   -- ===========================================================================
   constant WR_DIR_I       : integer := 0;
   constant WR_LOAD_OUT_I  : integer := 1;
@@ -52,30 +52,44 @@ architecture RTL of GPIO_OPERATION_DECODER is
   constant WR_IRQ_MASK_I  : integer := 3;
   constant WR_RISE_MASK_I : integer := 4;
   constant WR_FALL_MASK_I : integer := 5;
-  constant WR_IRQ_CLR_I   : integer := 6;
+  constant IRQ_CLR_I   : integer := 6;
 
   -- ===========================================================================
-  -- WRITE Address Map
+  -- Direction Register
   -- ===========================================================================
   constant ADDR_WR_DIR       : std_logic_vector(3 downto 0) := "0000";
-  constant ADDR_WR_OUT_LOAD  : std_logic_vector(3 downto 0) := "0001";
-  constant ADDR_WR_OUT_SET   : std_logic_vector(3 downto 0) := "0010";
-  constant ADDR_WR_OUT_CLR   : std_logic_vector(3 downto 0) := "0011";
-  constant ADDR_WR_OUT_TGL   : std_logic_vector(3 downto 0) := "0100";
-  constant ADDR_WR_IRQ_MASK  : std_logic_vector(3 downto 0) := "0101";
-  constant ADDR_WR_RISE_MASK : std_logic_vector(3 downto 0) := "0110";
-  constant ADDR_WR_FALL_MASK : std_logic_vector(3 downto 0) := "0111";
-
+  constant ADDR_RD_DIR       : std_logic_vector(3 downto 0) := "0001";
   -- ===========================================================================
-  -- READ Address Map
+  -- Output Register
   -- ===========================================================================
-  constant ADDR_RD_DIR       : std_logic_vector(3 downto 0) := "1000";
-  constant ADDR_RD_OUT       : std_logic_vector(3 downto 0) := "1001";
-  constant ADDR_RD_PINS      : std_logic_vector(3 downto 0) := "1010";
-  constant ADDR_RD_IRQ_STAT  : std_logic_vector(3 downto 0) := "1011";
-  constant ADDR_RD_IRQ_MASK  : std_logic_vector(3 downto 0) := "1100";
-  constant ADDR_RD_RISE_MASK : std_logic_vector(3 downto 0) := "1101";
-  constant ADDR_RD_FALL_MASK : std_logic_vector(3 downto 0) := "1110";
+  constant ADDR_WR_OUT_LOAD  : std_logic_vector(3 downto 0) := "0010";
+  constant ADDR_WR_OUT_SET   : std_logic_vector(3 downto 0) := "0011";
+  constant ADDR_WR_OUT_CLR   : std_logic_vector(3 downto 0) := "0100";
+  constant ADDR_WR_OUT_TGL   : std_logic_vector(3 downto 0) := "0101";
+  constant ADDR_RD_OUT       : std_logic_vector(3 downto 0) := "0110";
+  -- ===========================================================================
+  -- IRQ MASK Register
+  -- ===========================================================================
+  constant ADDR_WR_IRQ_MASK  : std_logic_vector(3 downto 0) := "0111";
+  constant ADDR_RD_IRQ_MASK  : std_logic_vector(3 downto 0) := "1000";
+  -- ===========================================================================
+  -- IRQ Rising Edge Register
+  -- ===========================================================================
+  constant ADDR_WR_RISE_MASK : std_logic_vector(3 downto 0) := "1001";
+  constant ADDR_RD_RISE_MASK : std_logic_vector(3 downto 0) := "1010";
+  -- ===========================================================================
+  -- IRQ Falling Edge Register
+  -- ===========================================================================
+  constant ADDR_WR_FALL_MASK : std_logic_vector(3 downto 0) := "1011";
+  constant ADDR_RD_FALL_MASK : std_logic_vector(3 downto 0) := "1100";
+  -- ===========================================================================
+  -- IRQ Status Register
+  -- ===========================================================================
+  constant ADDR_RD_IRQ_STAT  : std_logic_vector(3 downto 0) := "1101";
+  -- ===========================================================================
+  -- Read Synchronized Pins 
+  -- ===========================================================================
+  constant ADDR_RD_PINS      : std_logic_vector(3 downto 0) := "1110";
 
 begin
 
@@ -93,7 +107,7 @@ begin
   wr_en(WR_IRQ_MASK_I)  <= write when address = ADDR_WR_IRQ_MASK  else '0';
   wr_en(WR_RISE_MASK_I) <= write when address = ADDR_WR_RISE_MASK else '0';
   wr_en(WR_FALL_MASK_I) <= write when address = ADDR_WR_FALL_MASK else '0';
-  wr_en(WR_IRQ_CLR_I)   <= read when address = ADDR_RD_IRQ_STAT   else '0';
+  wr_en(IRQ_CLR_I)   <= read when address = ADDR_RD_IRQ_STAT   else '0';
 
   -- -----------------------------------------------------------------------------
   -- GPIO OUTPUT OPERATION: multiplexer selector (wr_op)
