@@ -1,144 +1,73 @@
 import pytest
 from cocotb.binary import BinaryValue
-import cocotb
 import lib
 
 class GENERIC_PERIPHERAL(lib.Entity):
 
-    clk = lib.Entity.Input_pin
-    reset = lib.Entity.Input_pin
-    cs = lib.Entity.Input_pin
-    data_in = lib.Entity.Input_pin
-    data_out = lib.Entity.Output_pin
-    ack = lib.Entity.Output_pin
+    clk         = lib.Entity.Input_pin
+    reset       = lib.Entity.Input_pin
+    wr          = lib.Entity.Input_pin
+    rd          = lib.Entity.Input_pin
+    opcode      = lib.Entity.Input_pin
+    data_i      = lib.Entity.Input_pin
+    data_o      = lib.Entity.Output_pin
+    interrupt_o = lib.Entity.Output_pin
 
     # Class variables to store parameters for testing
-    peripheral_id = 0
-    data_width = 32
+    DATA_WIDTH = 32
+    OPERATION_CODE_WIDTH = 4
 
     @classmethod
-    def configure(cls, peripheral_id, data_width=None):
+    def configure(cls, operation_code_width, data_width=None):
         """Configure the class with generic parameters"""
-        cls.peripheral_id = peripheral_id
         if data_width is not None:
-            cls.data_width = data_width
+            cls.DATA_WIDTH = data_width
+        if operation_code_width is not None:
+            cls.OPERATION_CODE_WIDTH = operation_code_width
         return cls
 
     @classmethod
     def test_with(cls, testcase):
         """Override test_with to include generics"""
         parameters = {
-            "PERIPHERAL_ID": cls.peripheral_id,
-            "DATA_WIDTH": cls.data_width,
+            "DATA_WIDTH": cls.DATA_WIDTH,
+            "OPERATION_CODE_WIDTH": cls.OPERATION_CODE_WIDTH,
         }
 
         # Call parent method with parameters
         super().test_with(testcase, parameters=parameters)
        
 @GENERIC_PERIPHERAL.testcase
-async def tb_GENERIC_PERIPHERAL_case_1(dut: GENERIC_PERIPHERAL, trace: lib.Waveform):
-    """Test the GENERIC_PERIPHERAL invalid input"""
-
-    # Create a clock generator
-    clock = cocotb.clock.Clock(dut.clk, 10, units="ns")
-    cocotb.start_soon(clock.start())
-
-    # Initialize all inputs
-    dut.cs.value = 0
-    dut.data_in.value = 0
-    dut.reset.value = 0
-
-    # Wait a few cycles to stabilize
-    await cocotb.triggers.ClockCycles(dut.clk, 5)
+async def tb_GENERIC_PERIPHERAL(dut, trace: lib.Waveform):
+    """Test the GENERIC_PERIPHERAL """
+    trace.disable()
 
     # Apply reset
     dut.reset.value = 1
-    await cocotb.triggers.ClockCycles(dut.clk, 5)
+    await trace.cycle()
 
-    # Now check outputs during reset - use full width for binary values
-    zero32 = BinaryValue(value=0, n_bits=32, bigEndian=False)
-    yield trace.check(dut.ack, BinaryValue(value=0, n_bits=1))
-    yield trace.check(dut.data_out, zero32)
-
-    # Release reset, keep cs inactive
-    dut.reset.value = 0
-    await cocotb.triggers.ClockCycles(dut.clk, 5)
-
-    # Check outputs after reset, with cs=0
-    yield trace.check(dut.ack, BinaryValue(value=0, n_bits=1))
-    yield trace.check(dut.data_out, zero32)
-
-    # Now try with cs=1
-    dut.cs.value = 1
-    await cocotb.triggers.ClockCycles(dut.clk, 5)
-
-    # Check outputs with cs=1 - explicitly create 32-bit binary value for 42
-    id32 = BinaryValue(value=42, n_bits=32, bigEndian=False)
-    yield trace.check(dut.ack, BinaryValue(value=1, n_bits=1))
-    yield trace.check(dut.data_out, id32)
-
-@GENERIC_PERIPHERAL.testcase
-async def tb_GENERIC_PERIPHERAL_case_2(dut: GENERIC_PERIPHERAL, trace: lib.Waveform):
-    """Test the GENERIC_PERIPHERAL valid input"""
-
-    # Create a clock generator
-    clock = cocotb.clock.Clock(dut.clk, 10, units="ns")
-    cocotb.start_soon(clock.start())
-
-    # Initialize all inputs
-    dut.cs.value = 0
-    dut.data_in.value = 0
-
-    # Start with reset
-    dut.reset.value = 1
-    await cocotb.triggers.ClockCycles(dut.clk, 3)
-
-    # Create properly sized binary values for comparison
-    zero32 = BinaryValue(value=0, n_bits=32, bigEndian=False)
-    id32 = BinaryValue(value=42, n_bits=32, bigEndian=False)  # PERIPHERAL_ID = 42
-
-    # Verify reset state
-    yield trace.check(dut.ack, BinaryValue(value=0, n_bits=1))
-    yield trace.check(dut.data_out, zero32)
+    # Now check outputs during reset
+    zero_data_bus = BinaryValue(0, n_bits=GENERIC_PERIPHERAL.DATA_WIDTH, bigEndian=False)
+    yield trace.check(dut.interrupt_o, BinaryValue(0, n_bits=1))
+    yield trace.check(dut.data_o, zero_data_bus)
 
     # Release reset
     dut.reset.value = 0
-    await cocotb.triggers.ClockCycles(dut.clk, 2)
+    dut.opcode.value = 0
+    await trace.cycle()
 
-    # Test with CS active - should activate peripheral
-    dut.cs.value = 1
-    await cocotb.triggers.ClockCycles(dut.clk, 3)
+    # Check outputs after reset, with cs=0
+    yield trace.check(dut.interrupt_o, BinaryValue(0, n_bits=1))
+    yield trace.check(dut.data_o, zero_data_bus)
 
-    # Verify peripheral outputs ID when selected
-    yield trace.check(dut.ack, BinaryValue(value=1, n_bits=1))
-    yield trace.check(dut.data_out, id32)
+    # Now try with opcode = 1
+    dut.opcode.value = 1
+    await trace.cycle()
 
-    # Test with CS inactive - should deactivate peripheral
-    dut.cs.value = 0
-    await cocotb.triggers.ClockCycles(dut.clk, 3)
-
-    # Verify peripheral outputs zeros when deselected
-    yield trace.check(dut.ack, BinaryValue(value=0, n_bits=1))
-    yield trace.check(dut.data_out, zero32)
-
-    # Test rapid toggling of CS
-    for _ in range(3):
-        # Activate peripheral
-        dut.cs.value = 1
-        await cocotb.triggers.ClockCycles(dut.clk, 2)
-
-        # Verify activation
-        yield trace.check(dut.ack, BinaryValue(value=1, n_bits=1))
-        yield trace.check(dut.data_out, id32)
-
-        # Deactivate peripheral
-        dut.cs.value = 0
-        await cocotb.triggers.ClockCycles(dut.clk, 2)
-
-        # Verify deactivation
-        yield trace.check(dut.ack, BinaryValue(value=0, n_bits=1))
-        yield trace.check(dut.data_out, zero32)
-
+    # Check if interrupt and data_o are set
+    max_int_data_width = BinaryValue(4294967295, n_bits=GENERIC_PERIPHERAL.DATA_WIDTH, bigEndian=False)
+    yield trace.check(dut.interrupt_o, BinaryValue(value=1, n_bits=1))
+    yield trace.check(dut.data_o, max_int_data_width.binstr)
 
 @pytest.mark.synthesis
 def test_GENERIC_PERIPHERAL_synthesis():
@@ -148,9 +77,8 @@ def test_GENERIC_PERIPHERAL_synthesis():
 @pytest.mark.testcases
 def test_GENERIC_PERIPHERAL_testcases():
     """Test the GENERIC_PERIPHERAL testcases"""
-    GENERIC_PERIPHERAL.configure(42)
-    GENERIC_PERIPHERAL.test_with(tb_GENERIC_PERIPHERAL_case_1)
-    GENERIC_PERIPHERAL.test_with(tb_GENERIC_PERIPHERAL_case_2)
+    GENERIC_PERIPHERAL.configure(1, 32)
+    GENERIC_PERIPHERAL.test_with(tb_GENERIC_PERIPHERAL)
 
 if __name__ == "__main__":
     lib.run_tests(__file__)
