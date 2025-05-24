@@ -44,7 +44,7 @@ architecture RTL of GPIO_OPERATION_DECODER is
   --    3  | WR_IRQ_MASK   – Global interrupt‑enable mask
   --    4  | WR_RISE_MASK  – Rising‑edge interrupt mask
   --    5  | WR_FALL_MASK  – Falling‑edge interrupt mask
-  --    6  | IRQ_CLR    – Reset interrupt status on IRQ Register read
+  --    6  | IRQ_STATUS_CLR    – Reset interrupt status on IRQ Register read
   -- ===========================================================================
   constant WR_DIR_I       : integer := 0;
   constant WR_LOAD_OUT_I  : integer := 1;
@@ -57,79 +57,77 @@ architecture RTL of GPIO_OPERATION_DECODER is
   -- ===========================================================================
   -- Direction Register
   -- ===========================================================================
-  constant ADDR_WR_DIR       : std_logic_vector(3 downto 0) := "0000";
-  constant ADDR_RD_DIR       : std_logic_vector(3 downto 0) := "0001";
+  constant ADDR_DIR       : std_logic_vector(3 downto 0) := "0000";
   -- ===========================================================================
   -- Output Register
   -- ===========================================================================
-  constant ADDR_WR_OUT_LOAD  : std_logic_vector(3 downto 0) := "0010";
-  constant ADDR_WR_OUT_SET   : std_logic_vector(3 downto 0) := "0011";
-  constant ADDR_WR_OUT_CLR   : std_logic_vector(3 downto 0) := "0100";
-  constant ADDR_WR_OUT_TGL   : std_logic_vector(3 downto 0) := "0101";
-  constant ADDR_RD_OUT       : std_logic_vector(3 downto 0) := "0110";
+  constant ADDR_OUT_LOAD  : std_logic_vector(3 downto 0) := "0001";
+  constant ADDR_OUT_SET   : std_logic_vector(3 downto 0) := "0010";
+  constant ADDR_OUT_CLR   : std_logic_vector(3 downto 0) := "0011";
+  constant ADDR_OUT_TGL   : std_logic_vector(3 downto 0) := "0100";
   -- ===========================================================================
   -- IRQ MASK Register
   -- ===========================================================================
-  constant ADDR_WR_IRQ_MASK  : std_logic_vector(3 downto 0) := "0111";
-  constant ADDR_RD_IRQ_MASK  : std_logic_vector(3 downto 0) := "1000";
+  constant ADDR_IRQ_MASK  : std_logic_vector(3 downto 0) := "0101";
   -- ===========================================================================
   -- IRQ Rising Edge Register
   -- ===========================================================================
-  constant ADDR_WR_RISE_MASK : std_logic_vector(3 downto 0) := "1001";
-  constant ADDR_RD_RISE_MASK : std_logic_vector(3 downto 0) := "1010";
+  constant ADDR_RISE_MASK : std_logic_vector(3 downto 0) := "0110";
   -- ===========================================================================
   -- IRQ Falling Edge Register
   -- ===========================================================================
-  constant ADDR_WR_FALL_MASK : std_logic_vector(3 downto 0) := "1011";
-  constant ADDR_RD_FALL_MASK : std_logic_vector(3 downto 0) := "1100";
+  constant ADDR_FALL_MASK : std_logic_vector(3 downto 0) := "0111";
   -- ===========================================================================
   -- IRQ Status Register
   -- ===========================================================================
-  constant ADDR_RD_IRQ_STAT  : std_logic_vector(3 downto 0) := "1101";
+  constant ADDR_IRQ_STAT  : std_logic_vector(3 downto 0) := "1000";
   -- ===========================================================================
   -- Read Synchronized Pins 
   -- ===========================================================================
-  constant ADDR_RD_PINS      : std_logic_vector(3 downto 0) := "1110";
+  constant ADDR_PINS      : std_logic_vector(3 downto 0) := "1001";
 
 begin
 
   -- -----------------------------------------------------------------------------
   -- WRITE DECODING :
   -- -----------------------------------------------------------------------------
-  wr_en(WR_DIR_I)       <= write when address = ADDR_WR_DIR       else '0';
+  wr_en(WR_DIR_I)       <= write when address = ADDR_DIR       else '0';
 
-  wr_en(WR_LOAD_OUT_I)  <= write when address = ADDR_WR_OUT_LOAD  else '0';
+  wr_en(WR_LOAD_OUT_I)  <= write when address = ADDR_OUT_LOAD  else '0';
 
-  wr_en(WR_BIT_OUT_I)   <= write when address = ADDR_WR_OUT_SET or
-                                      address = ADDR_WR_OUT_CLR or
-                                      address = ADDR_WR_OUT_TGL  else '0';
+  wr_en(WR_BIT_OUT_I)   <= write when address = ADDR_OUT_SET or
+                                      address = ADDR_OUT_CLR or
+                                      address = ADDR_OUT_TGL  else '0';
 
-  wr_en(WR_IRQ_MASK_I)  <= write when address = ADDR_WR_IRQ_MASK  else '0';
-  wr_en(WR_RISE_MASK_I) <= write when address = ADDR_WR_RISE_MASK else '0';
-  wr_en(WR_FALL_MASK_I) <= write when address = ADDR_WR_FALL_MASK else '0';
-  wr_en(IRQ_CLR_I)   <= read when address = ADDR_RD_IRQ_STAT   else '0';
+  wr_en(WR_IRQ_MASK_I)  <= write when address = ADDR_IRQ_MASK  else '0';
+  wr_en(WR_RISE_MASK_I) <= write when address = ADDR_RISE_MASK else '0';
+  wr_en(WR_FALL_MASK_I) <= write when address = ADDR_FALL_MASK else '0';
+  wr_en(IRQ_CLR_I)   <= read when address = ADDR_IRQ_STAT   else '0';
 
   -- -----------------------------------------------------------------------------
   -- GPIO OUTPUT OPERATION: multiplexer selector (wr_op)
   -- -----------------------------------------------------------------------------
   with address select
-    wr_op <= "00" when ADDR_WR_OUT_LOAD,  -- LOAD
-             "01" when ADDR_WR_OUT_SET,   -- SET
-             "10" when ADDR_WR_OUT_CLR,   -- CLEAR
-             "11" when ADDR_WR_OUT_TGL,   -- TOGGLE
+    wr_op <= "00" when ADDR_OUT_LOAD,  -- LOAD
+             "01" when ADDR_OUT_SET,   -- SET
+             "10" when ADDR_OUT_CLR,   -- CLEAR
+             "11" when ADDR_OUT_TGL,   -- TOGGLE
              "00" when others;            -- default (LOAD)
 
   -- -----------------------------------------------------------------------------
   -- GPIO READ OPERATION: multiplexer selector (rd_sel)
   -- -----------------------------------------------------------------------------
   with address select
-    rd_sel <= "000" when ADDR_RD_DIR,        -- 000 = DIRECTION register
-              "001" when ADDR_RD_OUT,        -- 001 = OUTPUT register
-              "010" when ADDR_RD_PINS,       -- 010 = INPUT pins
-              "011" when ADDR_RD_IRQ_STAT,   -- 011 = IRQ status
-              "100" when ADDR_RD_IRQ_MASK,   -- 100 = IRQ mask
-              "101" when ADDR_RD_RISE_MASK,  -- 101 = Rising‑edge mask
-              "110" when ADDR_RD_FALL_MASK,  -- 110 = Falling‑edge mask
-              "111" when others;             -- 111 = NOP / RESERVED
+    rd_sel <= "000" when ADDR_DIR,
+              "001" when ADDR_OUT_LOAD,
+              "001" when ADDR_OUT_SET,
+              "001" when ADDR_OUT_CLR,
+              "001" when ADDR_OUT_TGL,
+              "010" when ADDR_PINS,
+              "011" when ADDR_IRQ_STAT,
+              "100" when ADDR_IRQ_MASK,
+              "101" when ADDR_RISE_MASK,
+              "110" when ADDR_FALL_MASK,
+              "111" when others;
 
 end architecture RTL;

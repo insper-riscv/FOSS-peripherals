@@ -18,24 +18,29 @@ class GPIO_OPERATION_DECODER(lib.Entity):
     rd_sel  = lib.Entity.Output_pin  # 3 bits
 
 # -----------------------------------------------------------------------------
-# Address map — matches the VHDL decoder
+# Address map — matches the NEW VHDL decoder
 # -----------------------------------------------------------------------------
 ADDR = {
     "wr_dir":        "0000",
-    "rd_dir":        "0001",
-    "wr_out_load":   "0010",
-    "wr_out_set":    "0011",
-    "wr_out_clear":  "0100",
-    "wr_out_toggle": "0101",
-    "rd_out":        "0110",
-    "wr_irq_mask":   "0111",
-    "rd_irq_mask":   "1000",
-    "wr_rise_mask":  "1001",
-    "rd_rise_mask":  "1010",
-    "wr_fall_mask":  "1011",
-    "rd_fall_mask":  "1100",
-    "rd_irq_stat":   "1101",
-    "rd_pins":       "1110",
+    "wr_out_load":   "0001",
+    "wr_out_set":    "0010",
+    "wr_out_clear":  "0011",
+    "wr_out_toggle": "0100",
+    "wr_irq_mask":   "0101",
+    "wr_rise_mask":  "0110",
+    "wr_fall_mask":  "0111",
+
+    "rd_dir":        "0000",  # same as wr_dir
+    "rd_out_load":   "0001",
+    "rd_out_set":    "0010",
+    "rd_out_clear":  "0011",
+    "rd_out_toggle": "0100",
+
+    "rd_irq_mask":   "0101",
+    "rd_rise_mask":  "0110",
+    "rd_fall_mask":  "0111",
+    "rd_irq_stat":   "1000",
+    "rd_pins":       "1001",
     "nop":           "1111"
 }
 
@@ -68,14 +73,17 @@ WRITE_CASES = [
 # Read decoding test cases (name, rd_sel value, wr_en expected value)
 # -----------------------------------------------------------------------------
 READ_CASES = [
-    ("rd_dir",       "000", "0000000"),
-    ("rd_out",       "001", "0000000"),
-    ("rd_pins",      "010", "0000000"),
-    ("rd_irq_stat",  "011", "1000000"),  # IRQ_CLR on read
-    ("rd_irq_mask",  "100", "0000000"),
-    ("rd_rise_mask", "101", "0000000"),
-    ("rd_fall_mask", "110", "0000000"),
-    ("nop",          "111", "0000000"),
+    ("rd_dir",         "000", "0000000"),
+    ("rd_out_load",    "001", "0000000"),
+    ("rd_out_set",     "001", "0000000"),
+    ("rd_out_clear",   "001", "0000000"),
+    ("rd_out_toggle",  "001", "0000000"),
+    ("rd_pins",        "010", "0000000"),
+    ("rd_irq_stat",    "011", "1000000"),  # IRQ_CLR
+    ("rd_irq_mask",    "100", "0000000"),
+    ("rd_rise_mask",   "101", "0000000"),
+    ("rd_fall_mask",   "110", "0000000"),
+    ("nop",            "111", "0000000"),
 ]
 
 # -----------------------------------------------------------------------------

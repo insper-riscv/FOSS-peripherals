@@ -27,23 +27,27 @@ class GPIO(lib.Entity):
 # -----------------------------------------------------------------------------
 ADDR = {
     "wr_dir":        "0000",
-    "rd_dir":        "0001",
-    "wr_out_load":   "0010",
-    "wr_out_set":    "0011",
-    "wr_out_clear":  "0100",
-    "wr_out_toggle": "0101",
-    "rd_out":        "0110",
-    "wr_irq_mask":   "0111",
-    "rd_irq_mask":   "1000",
-    "wr_rise_mask":  "1001",
-    "rd_rise_mask":  "1010",
-    "wr_fall_mask":  "1011",
-    "rd_fall_mask":  "1100",
-    "rd_irq_stat":   "1101",
-    "rd_pins":       "1110",
+    "wr_out_load":   "0001",
+    "wr_out_set":    "0010",
+    "wr_out_clear":  "0011",
+    "wr_out_toggle": "0100",
+    "wr_irq_mask":   "0101",
+    "wr_rise_mask":  "0110",
+    "wr_fall_mask":  "0111",
+
+    "rd_dir":        "0000",  # same as wr_dir
+    "rd_out_load":   "0001",
+    "rd_out_set":    "0010",
+    "rd_out_clear":  "0011",
+    "rd_out_toggle": "0100",
+
+    "rd_irq_mask":   "0101",
+    "rd_rise_mask":  "0110",
+    "rd_fall_mask":  "0111",
+    "rd_irq_stat":   "1000",
+    "rd_pins":       "1001",
     "nop":           "1111"
 }
-
 # -----------------------------------------------------------------------------
 # Helper utilities ------------------------------------------------------------
 # -----------------------------------------------------------------------------
@@ -167,20 +171,25 @@ class GPIO(lib.Entity):
 # ----------------------------------------------------------------------------
 ADDR = {
     "wr_dir":        "0000",
-    "rd_dir":        "0001",
-    "wr_out_load":   "0010",
-    "wr_out_set":    "0011",
-    "wr_out_clear":  "0100",
-    "wr_out_toggle": "0101",
-    "rd_out":        "0110",
-    "wr_irq_mask":   "0111",
-    "rd_irq_mask":   "1000",
-    "wr_rise_mask":  "1001",
-    "rd_rise_mask":  "1010",
-    "wr_fall_mask":  "1011",
-    "rd_fall_mask":  "1100",
-    "rd_irq_stat":   "1101",
-    "rd_pins":       "1110",
+    "wr_out_load":   "0001",
+    "wr_out_set":    "0010",
+    "wr_out_clear":  "0011",
+    "wr_out_toggle": "0100",
+    "wr_irq_mask":   "0101",
+    "wr_rise_mask":  "0110",
+    "wr_fall_mask":  "0111",
+
+    "rd_dir":        "0000",  # same as wr_dir
+    "rd_out_load":   "0001",
+    "rd_out_set":    "0010",
+    "rd_out_clear":  "0011",
+    "rd_out_toggle": "0100",
+
+    "rd_irq_mask":   "0101",
+    "rd_rise_mask":  "0110",
+    "rd_fall_mask":  "0111",
+    "rd_irq_stat":   "1000",
+    "rd_pins":       "1001",
     "nop":           "1111"
 }
 # ----------------------------------------------------------------------------
