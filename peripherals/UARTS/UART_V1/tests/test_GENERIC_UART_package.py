@@ -1,7 +1,7 @@
 import pytest
 import lib
-from peripherals.UART.tests.test_TYPES_package import TYPES
-from peripherals.UART.tests.test_GENERIC_OPERATION_DECODER_package import GENERIC_OPERATION_DECODER
+from peripherals.UARTS.UART_V1.tests.test_TYPES_package import TYPES
+from peripherals.UARTS.UART_V1.tests.test_GENERIC_OPERATION_DECODER_package import GENERIC_OPERATION_DECODER
 
 class GENERIC_BAUD_GENERATOR(lib.Package):
     pass

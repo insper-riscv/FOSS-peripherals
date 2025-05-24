@@ -4,7 +4,7 @@ from cocotb.binary import BinaryValue
 from cocotb.triggers import Timer
 from lib.entity import Entity
 import lib
-from peripherals.UART.tests.test_GENERIC_UART_package import GENERIC_UART as GENERIC_UART_TB
+from peripherals.UARTS.UART_V1.tests.test_GENERIC_UART_package import GENERIC_UART as GENERIC_UART_TB
 
 class GENERIC_UART(Entity):
     """Wrapper for the generic_uart DUT with all sub‐entities/package dependencies."""
