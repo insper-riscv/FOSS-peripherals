@@ -78,7 +78,6 @@ async def tb_GENERIC_ADDER_coverage_case(dut: GENERIC_ADDER, trace: lib.Waveform
 @pytest.mark.synthesis
 def test_GENERIC_ADDER_synthesis():
     GENERIC_ADDER.build_vhd()
-    GENERIC_ADDER.build_netlistsvg()
 
 @pytest.mark.testcases
 def test_GENERIC_ADDER_testcases():

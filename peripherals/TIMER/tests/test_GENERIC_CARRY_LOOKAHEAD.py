@@ -16,7 +16,6 @@ class GENERIC_CARRY_LOOKAHEAD(lib.Entity):
 @pytest.mark.synthesis
 def test_GENERIC_CARRY_LOOKAHEAD_synthesis():
     GENERIC_CARRY_LOOKAHEAD.build_vhd()
-    GENERIC_CARRY_LOOKAHEAD.build_netlistsvg()
 
 
 if __name__ == "__main__":

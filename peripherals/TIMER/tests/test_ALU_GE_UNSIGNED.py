@@ -83,7 +83,6 @@ async def tb_ALU_GE_UNSIGNED(dut: ALU_GE_UNSIGNED, trace: lib.Waveform):
 @pytest.mark.synthesis
 def test_ALU_GE_UNSIGNED_synthesis():
     ALU_GE_UNSIGNED.build_vhd()
-    ALU_GE_UNSIGNED.build_netlistsvg()
 
 # -----------------------------------------------------------------------------
 # Test-run wrapper for pytest

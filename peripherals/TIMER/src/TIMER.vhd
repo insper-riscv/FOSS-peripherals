@@ -1,3 +1,8 @@
+-- =============================================================================
+-- Entity: TIMER
+-- Description: Timer with configuration register (includes IRQ mask)
+-- =============================================================================
+
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
@@ -16,7 +21,7 @@ entity TIMER is
         -- Data Inputed from the Processor
         data_in     : in  STD_LOGIC_VECTOR(DATA_WIDTH-1 downto 0);
         -- GPIO Address accessed by the Processor
-        address     : in  STD_LOGIC_VECTOR(3 downto 0);
+        address     : in  STD_LOGIC_VECTOR(2 downto 0);
         -- Write Signal
         write       : in  std_logic; 
         -- Read Signal
@@ -34,14 +39,17 @@ architecture RTL of TIMER is
     -----------------------------------------------------------------------------
     -- Internal Control Signals
     -----------------------------------------------------------------------------
-    signal wr_en   : std_logic_vector(8 downto 0); -- Write enable signals
+    signal wr_en   : std_logic_vector(6 downto 0); -- Write enable signals
     signal cnt_sel : std_logic;             -- Counter input selector
     signal rd_sel  : std_logic_vector(2 downto 0); -- Readback selector 
+
     -----------------------------------------------------------------------------
     -- Register Signals
     -----------------------------------------------------------------------------
     signal top_reg  : std_logic_vector(DATA_WIDTH-1 downto 0); -- Top register
     signal duty_reg : std_logic_vector(DATA_WIDTH-1 downto 0); -- Duty register
+    signal prescaler_reg : std_logic_vector(DATA_WIDTH-1 downto 0); -- Prescaler register
+    signal config_reg : std_logic_vector(3 downto 0); -- Configuration register (4 bits wide)
 
     -----------------------------------------------------------------------------
     -- State Signals
@@ -57,6 +65,7 @@ architecture RTL of TIMER is
     signal pwm_out       : std_logic; -- PWM output signal
     signal pwm_alu      : std_logic; -- PWM ALU output signal
     signal irq_vec       : std_logic_vector(0 downto 0); -- IRQ vector signal
+    signal tick : std_logic; -- Tick signal for the prescaler
 
     ---------------------------------------------------------------------------
     -- Multiplexer Signals
@@ -66,17 +75,14 @@ architecture RTL of TIMER is
     signal configs_readback : std_logic_vector(DATA_WIDTH-1 downto 0); -- Config register output
     signal pwm_readback : std_logic_vector(DATA_WIDTH-1 downto 0); -- PWM readback signal
     signal overflow_readback : std_logic_vector(DATA_WIDTH-1 downto 0); -- Overflow readback signal
+
     ---------------------------------------------------------------------------
     -- Counter Signals
     ---------------------------------------------------------------------------
     signal counter : std_logic_vector(DATA_WIDTH-1 downto 0); -- Counter value
     signal next_counter : std_logic_vector(DATA_WIDTH-1 downto 0); -- Next counter value
 
-
-
-
 begin
-
     -------------------------------------------------------------------------------
     -- TIMER_OPERATION_DECODER  
     -------------------------------------------------------------------------------
@@ -89,37 +95,76 @@ begin
             cnt_sel => cnt_sel,
             rd_sel  => rd_sel
         );
-    
+
     -------------------------------------------------------------------------------
-    -- Start/Stop Flip-Flop
-    -- This flip-flop is used to control the start and stop of the timer.
-    -- When the start signal is '1', the timer starts counting. When it is '0',
-    -- the timer stops counting.
+    -- Prescaler Register
+    -- This register holds the prescaler value for the timer.
+    -- It is loaded with the data_in value when the wr_en(6) signal is high.
+    -- The prescaler value is used to change the clock frequency for the timer.
+    -- The prescaler register is 32 bits wide.
+    -- It is cleared on system reset or when the prescaler register is written to.
     -------------------------------------------------------------------------------
-    U_START_STOP : entity WORK.GENERIC_FLIP_FLOP
+    U_PRESCALER_REG : entity WORK.GENERIC_REGISTER
+        generic map (
+            DATA_WIDTH => 32
+        )
         port map (
             clock       => clock,
             clear       => clear,
-            enable      => wr_en(0), -- Enable signal for the flip-flop
-            source      => data_in(0), -- Data input to the flip-flop. 1 for start, 0 for stop.
-            destination => start_signal -- Enable signal for the timer
+            enable      => wr_en(6),
+            source      => data_in,
+            destination => prescaler_reg
+        );
+    -------------------------------------------------------------------------------
+    -- Clock Prescaler
+    -- This component generates a tick signal based on the prescaler value.
+    -- The tick signal is generated when the prescaler counter matches the prescaler value.
+    -- The prescaler is used to slow down the clock frequency for the timer.
+    -- The prescaler is 32 bits wide. The frequency varies from 50 Mhz to 0.0116 Hz.
+    -------------------------------------------------------------------------------
+    U_CLOCK_PRESCALER : entity WORK.CLOCK_PRESCALER
+        generic map (
+            DATA_WIDTH => DATA_WIDTH
+        )
+        port map (
+            clock        => clock,
+            clear        => clear,
+            prescaler_in => prescaler_reg,
+            tick         => tick
         );
 
     -------------------------------------------------------------------------------
-    -- Mode Flip-Flop
-    -- This flip-flop is used to control the mode of the timer.
-    -- When the mode signal is '1', the timer operates in hold mode. When it is '0',
-    -- the timer operates in auto-reset.
+    -- Configiration Register
+    -- This register holds the configuration bits for the timer
+    -- irq_mask, pwm_en, mode_signal, start_signal
+    -- irq_mask: Interrupt request mask
+    -- pwm_en: PWM enable signal
+    -- mode_signal: Mode signal for the timer (e.g., hold mode/ wrap-around)
+    -- start_signal: Start/Stop signal for the timer
+    -- The register is 4 bits wide, with each bit representing a different configuration
+    -- bit:
+    --   0: start_signal
+    --   1: mode_signal
+    --   2: pwm_en
+    --   3: irq_mask
     -------------------------------------------------------------------------------
-    U_MODE : entity WORK.GENERIC_FLIP_FLOP
+    U_CONFIG_REG : entity WORK.GENERIC_REGISTER
+        generic map (
+            DATA_WIDTH => 4
+        )
         port map (
             clock       => clock,
             clear       => clear,
-            enable      => wr_en(1), -- Enable signal for the flip-flop
-            source      => data_in(0), -- Data input to the flip-flop. 1 for hold mode, 0 for auto-reset.
-            destination => mode_signal -- Mode signal for the timer
+            enable      => wr_en(0),
+            source      => data_in(3 downto 0),
+            destination => config_reg
         );
-    
+
+    -- Unpack the config bits
+    start_signal <= config_reg(0);
+    mode_signal  <= config_reg(1);
+    pwm_en       <= config_reg(2);
+    irq_mask     <= config_reg(3);
     ---------------------------------------------------------------------------
     -- Mux Counter Selector
     -- Loads or increments the counter based on the cnt_sel signal.
@@ -150,11 +195,12 @@ begin
         )
         port map (
             clock       => clock,
-            clear       => clear or wr_en(8) or (overflow and not(mode_signal)), -- Clear signal for the register
-            enable       => wr_en(3) or (start_signal and not(overflow and mode_signal)), -- Enable signal for the register
+            clear       => clear or wr_en(2) or (overflow and not(mode_signal)), -- Clear signal for the register
+            enable       => wr_en(1) or (start_signal and tick and not(overflow and mode_signal)), -- Enable signal for the register
             source     => mux_cnt, -- Data input to the register (mux output)
             destination    => counter -- Data output from the register (current counter value)
         );
+
     ----------------------------------------------------------------------------
     -- Constant Adder
     -- This adder is used to increment the counter by 1.
@@ -182,7 +228,7 @@ begin
         port map (
             clock       => clock,
             clear       => clear,
-            enable       => wr_en(4), -- Enable signal for the register
+            enable       => wr_en(3), -- Enable signal for the register
             source     => data_in, -- Data input to the register
             destination    => top_reg -- Data output from the register
         );
@@ -200,25 +246,10 @@ begin
             top_value     => top_reg, -- Top register value
             overflow      => overflow -- Overflow signal (active high)
         );
-    
-    ---------------------------------------------------------------------------
-    -- IRQ Mask Register
-    -- This register holds the IRQ mask value.
-    -- It is loaded with the data_in value when the wr_en(6) signal is high.
-    -- The IRQ mask is used to enable or disable the overflow interrupt.
-    ---------------------------------------------------------------------------
-    U_IRQ_MASK_REG : entity WORK.GENERIC_FLIP_FLOP
-        port map (
-            clock       => clock,
-            clear       => clear,
-            enable       => wr_en(6), -- Enable signal for the register
-            source     => data_in(0), -- Data input to the register
-            destination    => irq_mask -- Data output from the register (IRQ mask value)
-        );
+
 
     -- ============================================================================
     -- REGISTER THE PREVIOUS OVERFLOW
-    -- 
     -- ============================================================================
     U_OVF_PREV : entity WORK.GENERIC_FLIP_FLOP
         port map (
@@ -237,7 +268,7 @@ begin
     U_IRQ_STATUS_REG : entity WORK.GENERIC_FLIP_FLOP
         port map (
             clock       => clock,
-            clear       => clear or wr_en(7), -- Clear signal for the register
+            clear       => clear or wr_en(5), -- Clear signal for the register
             enable       => overflow_pulse, -- Enable signal for the register (overflow signal)
             source     => '1', 
             destination    => overflow_status -- Data output from the register (overflow status)
@@ -275,26 +306,12 @@ begin
         port map (
             clock       => clock,
             clear       => clear,
-            enable       => wr_en(5), -- Enable signal for the register
+            enable       => wr_en(4), -- Enable signal for the register
             source     => data_in, -- Data input to the register
             destination    => duty_reg -- Data output from the register
         );
 
-    ---------------------------------------------------------------------------
-    -- PWM Enable Flip-Flop
-    -- This flip-flop is used to control the PWM output.
-    -- When the PWM enable signal is '1', the PWM output is enabled. When it is '0',
-    -- the PWM output is disabled.
-    ------------------------------------------------------------------------------
-    U_PWM_EN : entity WORK.GENERIC_FLIP_FLOP
-        port map (
-            clock       => clock,
-            clear       => clear,
-            enable      => wr_en(2), -- Enable signal for the flip-flop
-            source      => data_in(0), -- Data input to the flip-flop. 1 for PWM enable, 0 for PWM disable.
-            destination => pwm_en -- PWM enable signal for the timer
-        );
-    ---------------------------------------------------------------------------
+  ---------------------------------------------------------------------------
     -- PWM ALU
     -- This ALU is used to compare the current counter value with the duty cycle value.
     -- It outputs a signal indicating whether the counter is less than the duty cycle.
@@ -307,7 +324,7 @@ begin
         port map (
             source_1    => counter, -- Current counter value
             source_2    => duty_reg, -- Duty cycle value
-            ge         => pwm_alu -- PWM output signal (1 when counter < duty cycle)
+            ge         => pwm_alu  -- PWM output signal (1 when counter < duty cycle)
         );
 
     ---------------------------------------------------------------------------
@@ -322,6 +339,7 @@ begin
             data_out => pwm_out -- Data output from the buffer (PWM output signal)
         );
     pwm <= pwm_out; -- Assign the PWM output signal to the output
+
     ---------------------------------------------------------------------------
     -- Mux Output Selector
     -- This multiplexer selects the output data based on the read signal and the rd_sel signal.
@@ -343,8 +361,9 @@ begin
             source_4    =>  configs_readback, -- Source 3 for the multiplexer (config register value)
             source_5    => pwm_readback , -- Source 4 for the multiplexer (not used)
             source_6    => overflow_readback, -- Source 5 for the multiplexer (not used)
-            source_7    => (others => '0'), -- Source 6 for the multiplexer (not used)
+            source_7    => prescaler_reg, -- Source 6 for the multiplexer (prescaler register value)
             source_8    => (others => '0'), -- Source 7 for the multiplexer (not used)
             destination => data_out -- Mux output for the data_out signal
         );
+
 end architecture;

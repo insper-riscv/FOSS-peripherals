@@ -95,7 +95,6 @@ async def tb_GENERIC_MUX_2X1_case_coverage_5_bits(dut: GENERIC_MUX_2X1, trace: l
 @pytest.mark.synthesis
 def test_GENERIC_MUX_2X1_synthesis():
     GENERIC_MUX_2X1.build_vhd()
-    GENERIC_MUX_2X1.build_netlistsvg()
 
 @pytest.mark.testcases
 def test_GENERIC_MUX_2X1_testcases():

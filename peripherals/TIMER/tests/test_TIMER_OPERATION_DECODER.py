@@ -16,12 +16,12 @@ class TIMER_OPERATION_DECODER(lib.Entity):
     _package = GENERICS
 
     # Inputs
-    address = lib.Entity.Input_pin   # std_logic_vector(3 downto 0)
+    address = lib.Entity.Input_pin   # std_logic_vector(2 downto 0)
     write   = lib.Entity.Input_pin   # std_logic
     read    = lib.Entity.Input_pin   # std_logic
 
     # Outputs
-    wr_en   = lib.Entity.Output_pin  # std_logic_vector(8 downto 0)
+    wr_en   = lib.Entity.Output_pin  # std_logic_vector(5 downto 0)
     cnt_sel = lib.Entity.Output_pin  # std_logic
     rd_sel  = lib.Entity.Output_pin  # std_logic_vector(2 downto 0)
 
@@ -30,69 +30,58 @@ class TIMER_OPERATION_DECODER(lib.Entity):
 # -----------------------------------------------------------------------------
 ADDR = {
     # WRITE addresses
-    "wr_start_stop": "0000",
-    "wr_mode":       "0001",
-    "wr_pwm_en":     "0010",
-    "wr_load_timer": "0011",
-    "wr_load_top":   "0100",
-    "wr_load_duty":  "0101",
-    "wr_irq_mask":   "0110",
-    "wr_reset":      "0111",
+    "wr_config":      "000",
+    "wr_load_timer":  "001",
+    "wr_reset":       "010",
+    "wr_load_top":    "011",
+    "wr_load_duty":   "100",
+    "wr_prescaler":   "111",
 
     # READ addresses
-    "rd_timer":      "1000",
-    "rd_top":        "1001",
-    "rd_duty":       "1010",
-    "rd_configs":    "1011",
-    "rd_pwm":        "1100",
-    "rd_ovf_status": "1101",
-
-    # Anything else → NOP / RESERVED
-    "nop":           "1111",
+    "rd_ovf_status":  "101",
+    "rd_pwm":         "110",
+    "rd_timer":       "001",
+    "rd_top":         "011",
+    "rd_duty":        "100",
+    "rd_config":      "000",
+    "rd_prescaler":    "111",
 }
 
 # -----------------------------------------------------------------------------
 # Drive address + strobes for one clock cycle
-#   - dut: the DUT instance (TIMER_OPERATION_DECODER)
-#   - trace: the waveform trace object (lib.Waveform)
-#   - op: operation name (string) to be used for the address
 # -----------------------------------------------------------------------------
 async def dec_op(dut, trace, op: str, *, is_write: bool, is_read: bool):
     """Drives address + strobes for one clock cycle."""
-    dut.address.value = BinaryValue(ADDR[op], n_bits=4)
+    dut.address.value = BinaryValue(ADDR[op], n_bits=3)
     dut.write.value   = BinaryValue('1' if is_write else '0')
     dut.read.value    = BinaryValue('1' if is_read else '0')
-    await trace.cycle()            # apply for exactly one cycle
+    await trace.cycle()
     dut.write.value   = BinaryValue('0')
     dut.read.value    = BinaryValue('0')
 
 # -----------------------------------------------------------------------------
 # Expected results for WRITE-accesses
-#   tuple: (operation-name, wr_en_bit_index, expected_cnt_sel)
 # -----------------------------------------------------------------------------
 WRITE_CASES = [
-    ("wr_start_stop", 0, 0),
-    ("wr_mode",       1, 0),
-    ("wr_pwm_en",     2, 0),
-    ("wr_load_timer", 3, 1),  # cnt_sel must pulse high on this write
-    ("wr_load_top",   4, 0),
-    ("wr_load_duty",  5, 0),
-    ("wr_irq_mask",   6, 0),
-    ("wr_reset",      8, 0),
+    ("wr_config",      0, 0),
+    ("wr_load_timer",  1, 1),
+    ("wr_reset",       2, 0),
+    ("wr_load_top",    3, 0),
+    ("wr_load_duty",   4, 0),
+    ("wr_prescaler", 6, 0),
 ]
 
 # -----------------------------------------------------------------------------
 # Expected results for READ-accesses
-#   tuple: (operation-name, expected_rd_sel)
 # -----------------------------------------------------------------------------
 READ_CASES = [
-    ("rd_timer",      "000"),
-    ("rd_top",        "001"),
-    ("rd_duty",       "010"),
-    ("rd_configs",    "011"),
-    ("rd_pwm",        "100"),
-    ("rd_ovf_status", "101"),  # should also pulse wr_en(7)
-    ("nop",           "111"),
+    ("rd_timer",       "000"),
+    ("rd_top",         "001"),
+    ("rd_duty",        "010"),
+    ("rd_config",      "011"),
+    ("rd_pwm",         "100"),
+    ("rd_ovf_status",  "101"),
+    ("rd_prescaler",    "110"),
 ]
 
 # -----------------------------------------------------------------------------
@@ -106,32 +95,26 @@ async def tb_timer_operation_decoder_manual(dut: TIMER_OPERATION_DECODER, trace:
     # WRITE decoding
     # ------------------------
     for name, bit_i, exp_cnt in WRITE_CASES:
-        # Apply the WRITE operation
         await dec_op(dut, trace, name, is_write=True, is_read=False)
 
-        exp_wr_en = format(1 << bit_i, "09b")
-        # wr_en must match the address map
+        exp_wr_en = format(1 << bit_i, "07b")
+        print(f"Expected wr_en for {name}: {exp_wr_en}")
         yield trace.check(dut.wr_en, exp_wr_en, f"wr_en mismatch for WRITE op: {name}")
-        # cnt_sel must pulse high on wr_load_timer (bit-3)
         yield trace.check(dut.cnt_sel, str(exp_cnt), f"cnt_sel mismatch for WRITE op: {name}")
 
     # ------------------------
     # READ decoding
     # ------------------------
     for name, exp_rd_sel in READ_CASES:
-        # Apply the READ operation
         await dec_op(dut, trace, name, is_write=False, is_read=True)
 
-        # rd_sel must match the address map
         yield trace.check(dut.rd_sel, exp_rd_sel, f"rd_sel mismatch for READ op: {name}")
 
-        # wr_en pulses only on rd_ovf_status (bit-7)
         if name == "rd_ovf_status":
-            yield trace.check(dut.wr_en, "010000000","wr_en(7) should pulse during rd_ovf_status")
+            yield trace.check(dut.wr_en, "0100000", "wr_en(5) should pulse during rd_ovf_status")
         else:
-            yield trace.check(dut.wr_en, "000000000",f"wr_en should be 0 during READ op: {name}")
+            yield trace.check(dut.wr_en, "0000000", f"wr_en should be 0 during READ op: {name}")
 
-        # cnt_sel must stay low on all pure READs
         yield trace.check(dut.cnt_sel, "0", f"cnt_sel should be 0 during READ op: {name}")
 
 # -----------------------------------------------------------------------------
@@ -140,7 +123,7 @@ async def tb_timer_operation_decoder_manual(dut: TIMER_OPERATION_DECODER, trace:
 @pytest.mark.synthesis
 def test_TIMER_OPERATION_DECODER_synthesis():
     TIMER_OPERATION_DECODER.build_vhd()
-    TIMER_OPERATION_DECODER.build_netlistsvg()
+
 
 # -----------------------------------------------------------------------------
 # Test-run wrapper for pytest

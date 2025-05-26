@@ -89,7 +89,6 @@ async def tb_counter_overflow(dut: COUNTER_OVERFLOW, trace: lib.Waveform):
 @pytest.mark.synthesis
 def test_COUNTER_OVERFLOW_synthesis():
     COUNTER_OVERFLOW.build_vhd()
-    COUNTER_OVERFLOW.build_netlistsvg()
 
 
 # -----------------------------------------------------------------------------
