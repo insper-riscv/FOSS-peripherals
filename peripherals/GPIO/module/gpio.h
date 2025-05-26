@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 /* ---------------------------------------------------------------------------
- * Base address ‑‑ change to match your memory map.
+ * Base address — change to match your memory map.
  * ---------------------------------------------------------------------------
  */
 #ifndef GPIO_BASE_DEFAULT
@@ -13,29 +13,25 @@
 #endif
 
 /* ---------------------------------------------------------------------------
- * Write Operations Offset
+ * Read and Write Register Offsets
  * ---------------------------------------------------------------------------
  */
-#define GPIO_WR_DIR_OFFSET        (0x0u << 2)    // 0000: Write Direction Register
-#define GPIO_WR_OUT_LOAD_OFFSET   (0x1u << 2)    // 0001: Load Output Register
-#define GPIO_WR_OUT_SET_OFFSET    (0x2u << 2)    // 0010: Set Output Bits
-#define GPIO_WR_OUT_CLR_OFFSET    (0x3u << 2)    // 0011: Clear Output Bits
-#define GPIO_WR_OUT_TGL_OFFSET    (0x4u << 2)    // 0100: Toggle Output Bits
-#define GPIO_WR_IRQ_MASK_OFFSET   (0x5u << 2)    // 0101: Write IRQ Mask
-#define GPIO_WR_RISE_MASK_OFFSET  (0x6u << 2)    // 0110: Write Rising Edge Mask
-#define GPIO_WR_FALL_MASK_OFFSET  (0x7u << 2)    // 0111: Write Falling Edge Mask
+#define GPIO_DIR_OFFSET        (0x0u << 2)    // 0000: Direction Register
+#define GPIO_OUT_LOAD_OFFSET   (0x1u << 2)    // 0001: Output Register (load)
+#define GPIO_OUT_SET_OFFSET    (0x2u << 2)    // 0010: Output Register (set)
+#define GPIO_OUT_CLR_OFFSET    (0x3u << 2)    // 0011: Output Register (clear)
+#define GPIO_OUT_TGL_OFFSET    (0x4u << 2)    // 0100: Output Register (toggle)
+#define GPIO_IRQ_MASK_OFFSET   (0x5u << 2)    // 0101: IRQ Mask Register
+#define GPIO_RISE_MASK_OFFSET  (0x6u << 2)    // 0110: Rising Edge Mask Register
+#define GPIO_FALL_MASK_OFFSET  (0x7u << 2)    // 0111: Falling Edge Mask Register
 
 /* ---------------------------------------------------------------------------
- * Read Operations Offset
+ * Read Only Register and Pins Offset
  * ---------------------------------------------------------------------------
  */
-#define GPIO_RD_DIR_OFFSET        (0x8u << 2)    // 1000: Read Direction
-#define GPIO_RD_OUT_OFFSET        (0x9u << 2)    // 1001: Read Output Register
-#define GPIO_RD_PINS_OFFSET       (0xAu << 2)    // 1010: Read Input Pins
-#define GPIO_RD_IRQ_STAT_OFFSET   (0xBu << 2)    // 1011: Read IRQ Status
-#define GPIO_RD_IRQ_MASK_OFFSET   (0xCu << 2)    // 1100: Read IRQ Mask
-#define GPIO_RD_RISE_MASK_OFFSET  (0xDu << 2)    // 1101: Read Rising Edge Mask
-#define GPIO_RD_FALL_MASK_OFFSET  (0xEu << 2)    // 1110: Read Falling Edge Mask
+#define GPIO_IRQ_STAT_OFFSET   (0x8u << 2)    // 1000: IRQ Status Register
+#define GPIO_PINS_OFFSET       (0x9u << 2)    // 1001: Pins Offset
+
 
 /* ---------------------------------------------------------------------------
  * Configuration Structure
@@ -44,12 +40,12 @@
 typedef struct {
     uint32_t direction;       // 1 = output, 0 = input
     uint32_t irq_mask;        // 1 = enabled, 0 = disabled
-    uint32_t irq_rise_mask;   // 1 = rising enabled, 0 = disabled
-    uint32_t irq_fall_mask;   // 1 = falling enabled, 0 = disabled
+    uint32_t irq_rise_mask;   // 1 = rising enabled
+    uint32_t irq_fall_mask;   // 1 = falling enabled
 } gpio_config_t;
 
 /* ---------------------------------------------------------------------------
- * Functions
+ * Functions Skeletons
  * ---------------------------------------------------------------------------
  */
 void      gpio_init(uintptr_t base_addr, const gpio_config_t *cfg);
@@ -71,4 +67,4 @@ uint32_t  gpio_read_irq_mask(void);
 uint32_t  gpio_read_irq_rise_mask(void);
 uint32_t  gpio_read_irq_fall_mask(void);
 
-#endif
+#endif // GPIO_H
