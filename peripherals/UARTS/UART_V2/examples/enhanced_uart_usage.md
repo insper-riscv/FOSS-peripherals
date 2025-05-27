@@ -7,7 +7,7 @@ The enhanced UART implementation provides significant improvements over the basi
 1. **FIFO Buffers**: 16-deep TX and RX FIFOs for improved throughput
 2. **Enhanced Baud Rate Generator**: Fractional baud rate support for precise timing
 3. **Better Error Detection**: Comprehensive error flags and status reporting
-4. **Improved Interrupts**: Separate TX, RX, and error interrupt signals
+4. **Single Interrupt with Status Register**: One interrupt signal with latched status register
 
 ## Configuration Register Layout
 
@@ -24,14 +24,15 @@ Bit 15-0:  Integer Baud Divisor (16 bits)
 
 ## Operation Codes
 
-| Operation | Code | Description |
-|-----------|------|-------------|
-| CONFIG    | 0    | Configuration register access |
-| TX_DATA   | 1    | Write data to TX FIFO |
-| RX_DATA   | 2    | Read data from RX FIFO |
-| STATUS    | 3    | Read status register |
-| BAUD      | 4    | Future: Advanced baud config |
-| FIFO      | 5    | Future: FIFO control |
+| Operation    | Code | Description |
+|--------------|------|-------------|
+| CONFIG       | 0    | Configuration register access |
+| TX_DATA      | 1    | Write data to TX FIFO |
+| RX_DATA      | 2    | Read data from RX FIFO |
+| STATUS       | 3    | Read status register |
+| INT_STATUS   | 4    | Read interrupt status register (clears on read) |
+| BAUD         | 5    | Future: Advanced baud config |
+| FIFO         | 6    | Future: FIFO control |
 
 ## Status Register Layout
 
@@ -50,6 +51,19 @@ Bit 2:     TX Almost Full
 Bit 1:     TX Full
 Bit 0:     TX Empty
 ```
+
+## Interrupt Status Register Layout (Read clears register)
+
+```
+Bit 10:    Overrun Error (latched)
+Bit 9:     Frame Error (latched)
+Bit 8:     Parity Error (latched)
+Bit 2:     Error Interrupt (any error)
+Bit 1:     RX Threshold Interrupt
+Bit 0:     TX Threshold Interrupt
+```
+
+The interrupt status register latches interrupt conditions and is cleared when read. This allows the CPU to determine what caused the interrupt even if the condition has since cleared.
 
 ## Usage Examples
 
@@ -80,9 +94,29 @@ for i in 0 to 15 loop
     wait for clk_period;
 end loop;
 
--- Check TX threshold interrupt for refill
-if tx_interrupt = '1' then
-    -- FIFO has drained below threshold, refill available
+-- Check interrupt and determine cause
+if interrupt = '1' then
+    -- Read interrupt status to determine cause
+    operation <= "100";  -- INT_STATUS
+    rd_i <= '1';
+    wait for clk_period;
+    int_status_reg <= data_o;
+    rd_i <= '0';
+    
+    if int_status_reg(0) = '1' then
+        -- TX threshold - FIFO has drained below threshold, refill available
+        refill_tx_fifo();
+    end if;
+    
+    if int_status_reg(1) = '1' then
+        -- RX threshold - data available for reading
+        read_rx_fifo();
+    end if;
+    
+    if int_status_reg(2) = '1' then
+        -- Error condition - check individual error bits
+        handle_uart_errors(int_status_reg);
+    end if;
 end if;
 ```
 

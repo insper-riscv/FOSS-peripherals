@@ -20,7 +20,7 @@ entity generic_uart_enhanced is
         -- Operation decoder parameters
         OP_WIDTH               : natural := 3;  -- Expanded for more operations
         CONTROL_SIGNAL_WIDTH   : natural := 4;  -- Expanded for more control signals
-        OPERATION_CONTROL_SIGNAL_COUNT : natural := 6;
+        OPERATION_CONTROL_SIGNAL_COUNT : natural := 7;  -- Increased for interrupt status
         OPERATION_TO_CONTROL_MAP : op_cs_map(0 to OPERATION_CONTROL_SIGNAL_COUNT-1) := (
             0 => (op   => std_logic_vector(to_unsigned(0, OP_WIDTH)),  -- Config write/read
                   ctrl => std_logic_vector(to_unsigned(1, CONTROL_SIGNAL_WIDTH))),
@@ -30,9 +30,11 @@ entity generic_uart_enhanced is
                   ctrl => std_logic_vector(to_unsigned(4, CONTROL_SIGNAL_WIDTH))),
             3 => (op   => std_logic_vector(to_unsigned(3, OP_WIDTH)),  -- Status read
                   ctrl => std_logic_vector(to_unsigned(8, CONTROL_SIGNAL_WIDTH))),
-            4 => (op   => std_logic_vector(to_unsigned(4, OP_WIDTH)),  -- Baud config
+            4 => (op   => std_logic_vector(to_unsigned(4, OP_WIDTH)),  -- Interrupt status read
+                  ctrl => std_logic_vector(to_unsigned(12, CONTROL_SIGNAL_WIDTH))),
+            5 => (op   => std_logic_vector(to_unsigned(5, OP_WIDTH)),  -- Baud config (future)
                   ctrl => std_logic_vector(to_unsigned(1, CONTROL_SIGNAL_WIDTH))),
-            5 => (op   => std_logic_vector(to_unsigned(5, OP_WIDTH)),  -- FIFO control
+            6 => (op   => std_logic_vector(to_unsigned(6, OP_WIDTH)),  -- FIFO control (future)
                   ctrl => std_logic_vector(to_unsigned(1, CONTROL_SIGNAL_WIDTH)))
         );
         DEFAULT_CONTROL_SIGNAL : std_logic_vector(CONTROL_SIGNAL_WIDTH-1 downto 0) := (others => '0')
@@ -51,10 +53,8 @@ entity generic_uart_enhanced is
         rx_i        : in  std_logic;
         tx_o        : out std_logic;
 
-        -- Enhanced Interrupts
-        tx_interrupt_o    : out std_logic;  -- TX FIFO threshold
-        rx_interrupt_o    : out std_logic;  -- RX FIFO threshold  
-        error_interrupt_o : out std_logic   -- Error conditions
+        -- Single Interrupt Signal
+        interrupt_o : out std_logic   -- Combined interrupt (check interrupt status register)
     );
 end entity generic_uart_enhanced;
 
@@ -62,11 +62,12 @@ architecture Structural of generic_uart_enhanced is
     signal baud_tick : std_logic;
 
     -- Operation decoder outputs
-    signal control_signal   : std_logic_vector(CONTROL_SIGNAL_WIDTH-1 downto 0);
-    signal wr_config        : std_logic;
-    signal wr_tx_op         : std_logic;
-    signal rd_rx_op         : std_logic;
-    signal rd_status_op     : std_logic;
+    signal control_signal     : std_logic_vector(CONTROL_SIGNAL_WIDTH-1 downto 0);
+    signal wr_config          : std_logic;
+    signal wr_tx_op           : std_logic;
+    signal rd_rx_op           : std_logic;
+    signal rd_status_op       : std_logic;
+    signal rd_int_status_op   : std_logic;
     
     -- Configuration registers
     signal config_reg_data  : std_logic_vector(DATA_WIDTH-1 downto 0);
@@ -98,24 +99,81 @@ architecture Structural of generic_uart_enhanced is
     signal frame_error      : std_logic;
     signal overrun_error    : std_logic;
 
+    -- Interrupt signals
+    signal tx_interrupt     : std_logic;
+    signal rx_interrupt     : std_logic;
+    signal error_interrupt  : std_logic;
+    
+    -- Interrupt status register (latched interrupts)
+    signal int_status_reg   : std_logic_vector(DATA_WIDTH-1 downto 0);
+    signal int_status_clear : std_logic;
+
     -- Status register construction
     signal status_reg       : std_logic_vector(DATA_WIDTH-1 downto 0);
 
 begin
     -- Control signal decoding
-    wr_config    <= wr_i and control_signal(0);
-    wr_tx_op     <= wr_i and control_signal(1) and en_tx;
-    rd_rx_op     <= rd_i and control_signal(2);
-    rd_status_op <= rd_i and control_signal(3);
+    wr_config        <= wr_i and control_signal(0);
+    wr_tx_op         <= wr_i and control_signal(1) and en_tx;
+    rd_rx_op         <= rd_i and control_signal(2);
+    rd_status_op     <= rd_i and control_signal(3);
+    rd_int_status_op <= rd_i when control_signal = "1100" else '0';  -- operation = 4
 
     -- TX/RX strobes
     tx_wr_strobe <= wr_tx_op and not tx_full;  -- Prevent writes to full FIFO
     rx_rd_strobe <= rd_rx_op and not rx_empty; -- Prevent reads from empty FIFO
 
-    -- Interrupt generation
-    tx_interrupt_o <= tx_threshold and en_tx;
-    rx_interrupt_o <= rx_threshold and en_rx;
-    error_interrupt_o <= parity_error or frame_error or overrun_error;
+    -- Individual interrupt signals
+    tx_interrupt    <= tx_threshold and en_tx;
+    rx_interrupt    <= rx_threshold and en_rx;
+    error_interrupt <= parity_error or frame_error or overrun_error;
+    
+    -- Combined interrupt output
+    interrupt_o <= tx_interrupt or rx_interrupt or error_interrupt;
+    
+    -- Clear interrupt status when read (delayed by one cycle)
+    process(clk, reset)
+    begin
+        if reset = '1' then
+            int_status_clear <= '0';
+        elsif rising_edge(clk) then
+            int_status_clear <= rd_int_status_op;
+        end if;
+    end process;
+
+    -- Interrupt status register (latched interrupts, cleared on read)
+    process(clk, reset)
+    begin
+        if reset = '1' then
+            int_status_reg <= (others => '0');
+        elsif rising_edge(clk) then
+            -- Clear has priority (delayed by one cycle from read)
+            if int_status_clear = '1' then
+                int_status_reg <= (others => '0');
+            else
+                -- Latch interrupt sources (only set bits, never clear)
+                if tx_interrupt = '1' then
+                    int_status_reg(0) <= '1';  -- TX threshold interrupt
+                end if;
+                if rx_interrupt = '1' then
+                    int_status_reg(1) <= '1';  -- RX threshold interrupt
+                end if;
+                if error_interrupt = '1' then
+                    int_status_reg(2) <= '1';  -- Error interrupt
+                end if;
+                -- Individual error latching
+                if parity_error = '1' then
+                    int_status_reg(8) <= '1';   -- Parity error
+                end if;
+                if frame_error = '1' then
+                    int_status_reg(9) <= '1';   -- Frame error
+                end if;
+                if overrun_error = '1' then
+                    int_status_reg(10) <= '1';  -- Overrun error
+                end if;
+            end if;
+        end if;
+    end process;
 
     -- Status register construction
     status_reg <= (
@@ -222,6 +280,7 @@ begin
     -- Output data multiplexing
     data_o <= config_reg_data when control_signal = "0001" else -- config read
               status_reg when control_signal = "1000" else      -- status read
+              int_status_reg when control_signal = "1100" else  -- interrupt status read
               (DATA_WIDTH-UART_DATA_BITS-1 downto 0 => '0') & rx_data_out when control_signal = "0100" else -- rx read
               (others => '0');
 
