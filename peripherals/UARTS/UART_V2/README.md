@@ -7,7 +7,7 @@ This directory contains the enhanced UART implementation with significant perfor
 - **FIFO Buffers**: 16-deep TX and RX FIFOs for burst operation
 - **Fractional Baud Generator**: Sub-clock precision for accurate timing
 - **Enhanced Error Detection**: Comprehensive error reporting
-- **Separate Interrupts**: TX, RX, and error interrupt signals
+- **Single Interrupt with Status**: One interrupt signal with latched status register
 
 ## Key Improvements over V1
 
@@ -17,7 +17,7 @@ This directory contains the enhanced UART implementation with significant perfor
 | **Baud Accuracy** | ±3.7% error | ±0.1% error | **37× better** |
 | **CPU Overhead** | High | Low | **16× reduction** |
 | **Error Detection** | Basic parity | Comprehensive | **Multiple error types** |
-| **Interrupts** | Single signal | Separate TX/RX/Error | **Granular control** |
+| **Interrupts** | Single signal | Single + Status Register | **Latched status** |
 
 ## File Structure
 
@@ -37,11 +37,16 @@ UART_V2/
 ├── tests/
 │   ├── test_GENERIC_UART_ENHANCED.py       # Enhanced UART tests
 │   ├── test_GENERIC_FIFO.py                # FIFO tests
+│   ├── test_GENERIC_UART_TX_FIFO.py        # TX FIFO tests
+│   ├── test_GENERIC_UART_RX_FIFO.py        # RX FIFO tests
 │   ├── test_GENERIC_UART_ENHANCED_package.py
-│   └── test_GENERIC_FIFO_package.py
+│   ├── test_GENERIC_FIFO_package.py
+│   ├── test_GENERIC_UART_TX_FIFO_package.py
+│   └── test_GENERIC_UART_RX_FIFO_package.py
 ├── examples/
 │   └── enhanced_uart_usage.md              # Usage guide
-├── ENHANCEMENT_SUMMARY.md                  # Implementation details
+├── SINGLE_INTERRUPT_MODIFICATION.md        # Single interrupt implementation details
+├── SINGLE_INTERRUPT_SUMMARY.md             # Single interrupt summary
 └── README.md                               # This file
 ```
 
@@ -66,7 +71,7 @@ UART_V2/
 - **Graceful handling** of temporary CPU delays
 
 ### 🔧 **System Integration**
-- **Separate interrupt signals**: TX threshold, RX threshold, errors
+- **Single interrupt signal** with latched status register
 - **Backward compatibility** with V1 register interface
 - **Configurable FIFO depths** (4-64 entries)
 - **Advanced configuration options**
@@ -88,9 +93,12 @@ for i in 0 to 15 loop
     write_uart_data(data_array(i));
 end loop;
 
--- Handle threshold interrupt for refill
-if tx_interrupt = '1' then
-    refill_tx_buffer();
+-- Handle interrupt and check status
+if interrupt = '1' then
+    int_status := read_interrupt_status();  -- Clears status register
+    if int_status.tx_threshold then refill_tx_buffer(); end if;
+    if int_status.rx_threshold then read_rx_buffer(); end if;
+    if int_status.error then handle_errors(); end if;
 end if;
 ```
 
@@ -143,7 +151,7 @@ The enhanced UART is designed for easy migration:
 
 1. **Pin-compatible interface** for basic operations
 2. **Extended configuration** with backward compatibility
-3. **Additional interrupt signals** (can be left unconnected initially)
+3. **Single interrupt signal** (simpler than V1's single interrupt)
 4. **Gradual feature adoption** possible
 
 See `examples/enhanced_uart_usage.md` for detailed migration guide.
@@ -171,4 +179,4 @@ The V2 implementation provides a foundation for future enhancements:
 - Multi-drop/9-bit communication modes
 - Advanced error recovery mechanisms
 
-See `ENHANCEMENT_SUMMARY.md` for complete implementation details. 
+See `SINGLE_INTERRUPT_MODIFICATION.md` for complete implementation details and `SINGLE_INTERRUPT_SUMMARY.md` for a concise overview of the single interrupt design. 
