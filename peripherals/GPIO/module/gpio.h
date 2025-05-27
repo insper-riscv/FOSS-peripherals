@@ -9,8 +9,14 @@
  * ---------------------------------------------------------------------------
  */
 #ifndef GPIO_BASE_DEFAULT
-#define GPIO_BASE_DEFAULT   0x40000000u
+#define GPIO_BASE_DEFAULT   0x1000u
 #endif
+
+// Default base address for GPIO peripheral
+static uintptr_t gpio_base = GPIO_BASE_DEFAULT;
+
+// Macro to access GPIO register via base + offset
+#define MEMO(off) (*(volatile uint32_t *)(gpio_base + (off)))
 
 /* ---------------------------------------------------------------------------
  * Read and Write Register Offsets
