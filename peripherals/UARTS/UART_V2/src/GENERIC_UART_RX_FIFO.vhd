@@ -5,8 +5,9 @@ use IEEE.MATH_REAL.ALL;
 
 entity generic_uart_rx_fifo is
     generic (
-        DATA_BITS  : integer := 8;
-        FIFO_DEPTH : natural := 16
+        DATA_BITS     : integer := 8;
+        FIFO_DEPTH    : natural := 16;
+        RX_THRESHOLD  : natural := 4    -- Configurable RX threshold
     );
     port (
         clk            : in  std_logic;
@@ -39,6 +40,10 @@ end entity generic_uart_rx_fifo;
 architecture Structural of generic_uart_rx_fifo is
     -- Calculate count width based on FIFO depth
     constant COUNT_WIDTH : natural := integer(ceil(log2(real(FIFO_DEPTH+1))));
+    
+    -- Validate threshold parameter
+    constant VALIDATED_THRESHOLD : natural := 
+        RX_THRESHOLD when RX_THRESHOLD <= FIFO_DEPTH else FIFO_DEPTH;
     
     -- FIFO signals
     signal fifo_wr_en     : std_logic;
@@ -73,8 +78,8 @@ begin
     frame_error_o <= frame_error;
     overrun_error_o <= overrun_error;
     
-    -- Threshold detection (trigger interrupt when FIFO has 4 or more items)
-    rx_threshold_o <= '1' when unsigned(fifo_count) >= 4 else '0';
+    -- Configurable threshold detection (trigger interrupt when FIFO has threshold or more items)
+    rx_threshold_o <= '1' when unsigned(fifo_count) >= VALIDATED_THRESHOLD else '0';
     
     -- Edge detection for new received data
     rx_ready_edge <= rx_core_ready and not rx_ready_prev;

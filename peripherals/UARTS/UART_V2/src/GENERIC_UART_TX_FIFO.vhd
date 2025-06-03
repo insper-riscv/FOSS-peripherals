@@ -5,8 +5,9 @@ use IEEE.MATH_REAL.ALL;
 
 entity generic_uart_tx_fifo is
     generic (
-        DATA_BITS  : integer := 8;
-        FIFO_DEPTH : natural := 16
+        DATA_BITS     : integer := 8;
+        FIFO_DEPTH    : natural := 16;
+        TX_THRESHOLD  : natural := 4    -- Configurable TX threshold
     );
     port (
         clk            : in  std_logic;
@@ -35,6 +36,10 @@ architecture Structural of generic_uart_tx_fifo is
     -- Calculate count width based on FIFO depth
     constant COUNT_WIDTH : natural := integer(ceil(log2(real(FIFO_DEPTH+1))));
     
+    -- Validate threshold parameter
+    constant VALIDATED_THRESHOLD : natural := 
+        TX_THRESHOLD when TX_THRESHOLD <= FIFO_DEPTH else FIFO_DEPTH;
+    
     -- FIFO signals
     signal fifo_rd_en     : std_logic;
     signal fifo_rd_data   : std_logic_vector(DATA_BITS-1 downto 0);
@@ -59,8 +64,8 @@ begin
     tx_almost_full_o <= fifo_almost_full;
     tx_busy_o <= tx_core_busy;
     
-    -- Threshold detection (trigger interrupt when FIFO has 4 or fewer items)
-    tx_threshold_o <= '1' when unsigned(fifo_count) <= 4 else '0';
+    -- Configurable threshold detection (trigger interrupt when FIFO has threshold or fewer items)
+    tx_threshold_o <= '1' when unsigned(fifo_count) <= VALIDATED_THRESHOLD else '0';
     
     -- FIFO instance
     tx_fifo : entity work.generic_fifo

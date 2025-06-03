@@ -16,6 +16,10 @@ entity generic_uart_enhanced is
         -- FIFO parameters
         TX_FIFO_DEPTH          : natural := 16;
         RX_FIFO_DEPTH          : natural := 16;
+        
+        -- Threshold parameters (configurable interrupt triggers)
+        TX_THRESHOLD           : natural := 4;   -- TX FIFO threshold for interrupt
+        RX_THRESHOLD           : natural := 4;   -- RX FIFO threshold for interrupt
 
         -- Operation decoder parameters
         OP_WIDTH               : natural := 3;  -- Expanded for more operations
@@ -237,8 +241,9 @@ begin
     -- Enhanced UART TX with FIFO
     tx_uart_fifo : entity work.generic_uart_tx_fifo
         generic map (
-            DATA_BITS  => UART_DATA_BITS,
-            FIFO_DEPTH => TX_FIFO_DEPTH
+            DATA_BITS    => UART_DATA_BITS,
+            FIFO_DEPTH   => TX_FIFO_DEPTH,
+            TX_THRESHOLD => TX_THRESHOLD
         )
         port map (
             clk              => clk,
@@ -257,8 +262,9 @@ begin
     -- Enhanced UART RX with FIFO
     rx_uart_fifo : entity work.generic_uart_rx_fifo
         generic map (
-            DATA_BITS  => UART_DATA_BITS,
-            FIFO_DEPTH => RX_FIFO_DEPTH
+            DATA_BITS    => UART_DATA_BITS,
+            FIFO_DEPTH   => RX_FIFO_DEPTH,
+            RX_THRESHOLD => RX_THRESHOLD
         )
         port map (
             clk              => clk,
